@@ -1,9 +1,9 @@
 {
   "cli-code.claude": {
     "prompt_tokens": {
+      "stable": 2346,
       "context": 249,
-      "stable": 1935,
-      "volatile": 1813
+      "volatile": 1833
     },
     "tool_tokens": 13277,
     "tools": [
@@ -44,9 +44,9 @@
   },
   "cli.claude": {
     "prompt_tokens": {
+      "stable": 1856,
       "context": 0,
-      "stable": 1445,
-      "volatile": 1813
+      "volatile": 1834
     },
     "tool_tokens": 13277,
     "tools": [
@@ -87,9 +87,9 @@
   },
   "cli.gemini": {
     "prompt_tokens": {
+      "stable": 2277,
       "context": 0,
-      "stable": 1866,
-      "volatile": 1811
+      "volatile": 1832
     },
     "tool_tokens": 13277,
     "tools": [
@@ -130,9 +130,9 @@
   },
   "cli.gpt": {
     "prompt_tokens": {
+      "stable": 3051,
       "context": 0,
-      "stable": 2640,
-      "volatile": 1809
+      "volatile": 1830
     },
     "tool_tokens": 13433,
     "tools": [
@@ -173,9 +173,9 @@
   },
   "cli.hermes": {
     "prompt_tokens": {
+      "stable": 1856,
       "context": 0,
-      "stable": 1445,
-      "volatile": 1813
+      "volatile": 1833
     },
     "tool_tokens": 13277,
     "tools": [
@@ -216,9 +216,9 @@
   },
   "cron.claude": {
     "prompt_tokens": {
+      "stable": 1728,
       "context": 0,
-      "stable": 1317,
-      "volatile": 1813
+      "volatile": 1834
     },
     "tool_tokens": 13277,
     "tools": [
@@ -259,9 +259,9 @@
   },
   "desktop.claude": {
     "prompt_tokens": {
+      "stable": 1990,
       "context": 0,
-      "stable": 1579,
-      "volatile": 1814
+      "volatile": 1835
     },
     "tool_tokens": 13912,
     "tools": [
@@ -303,9 +303,9 @@
   },
   "discord.claude": {
     "prompt_tokens": {
+      "stable": 1760,
       "context": 0,
-      "stable": 1349,
-      "volatile": 1814
+      "volatile": 1835
     },
     "tool_tokens": 13277,
     "tools": [
@@ -346,9 +346,9 @@
   },
   "telegram.claude": {
     "prompt_tokens": {
+      "stable": 1793,
       "context": 0,
-      "stable": 1382,
-      "volatile": 1814
+      "volatile": 1835
     },
     "tool_tokens": 13277,
     "tools": [
