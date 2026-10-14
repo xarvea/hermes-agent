@@ -1,10 +1,5 @@
-# actionlint knows only GitHub-hosted runner labels. An org admin names the
-# larger runners. Each one therefore reads as "unknown runner label" and hides
-# the real findings, unless this file declares it.
+# actionlint does not recognize this organization-provisioned Windows ARM64 runner label.
+# Keep only the non-standard label still used by architecture-specific jobs.
 self-hosted-runner:
   labels:
-    - ubuntu-latest-96-core
-    - ubuntu-24.04
-    - ubuntu-24.04-arm
-    - windows-latest
     - windows-latest-32-arm-core
