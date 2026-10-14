@@ -47,3 +47,26 @@
 ## Phase 0 closure rule
 
 This matrix is an audit artifact, not runtime proof. Close Phase 0 only after each applicable enforcement path has a source trace and a passing focused test (or a documented, explicitly accepted limitation), the task-backend and delegation contracts are tested, and the threat-model acceptance matrix is evidence-backed.
+
+## Existing test suites mapped to the enforcement matrix
+
+The following are **candidate existing tests**, identified by source-tree inspection. Their existence is not proof that they pass on the current branch. CI outcomes and focused runtime execution must be recorded before closing Phase 0.
+
+| Matrix concern | Existing test candidates | What still must be established |
+|---|---|---|
+| Terminal destructive-command approval and hard blocks | `tests/tools/test_approval.py`, `tests/tools/test_approval_deny_rules.py`, `tests/e2e/core/security/test_approval_boundary.py`, `tests/agent/test_terminal_approval_batch.py` | Confirm current-head results and trace each enabled terminal entry point, including unattended and delegated contexts. |
+| Execute-code authorization and unattended denial | `tests/tools/test_execute_code_approval_cluster.py`, `tests/tools/test_execute_code_lifecycle_guard_deadline.py` | Confirm all registered execute-code surfaces reach the guard and fail closed when approval cannot be obtained. |
+| Gateway approval boundaries | `tests/gateway/test_approval_boundary.py`, `tests/gateway/test_approval_prompt_redaction.py` | Confirm approval state remains session-scoped and sensitive payloads are redacted on every relevant output path. |
+| Delegated child isolation from Kanban mutation | `tests/tools/test_delegate_kanban_isolation.py`, `tests/hermes_state/test_delegate_child_routing_inheritance.py` | Preserve the runtime fence; prove a delegated child cannot claim, complete, delete, or otherwise mutate a parent-owned Kanban task even with inherited environment variables. |
+| Worker profile/tool scope and write guard | `tests/hermes_cli/test_kanban_worker_terminal_scope.py`, `tests/hermes_cli/test_kanban_write_guard.py` | Verify workspace containment and profile/credential isolation in the supported execution environments. |
+| Durable graph, dependency gate, interruption/recovery | `tests/hermes_cli/test_kanban_swarm.py`, `tests/gateway/test_kanban_reconcile_orphans.py`, `tests/e2e/core/kanban/test_kanban_dispatcher_restart.py`, `tests/e2e/core/kanban/test_kanban_worker_sigkill.py` | Confirm lifecycle behavior and idempotent recovery on the current head; dispatch success must not be treated as verified task completion. |
+
+### Team OS-specific gaps not closed by the existing runtime tests
+
+- [ ] Explicit per-run backend selection and a negative test proving no task transitions are written to both Kanban and the SQLite fallback.
+- [ ] Typed role/capability validation: unknown roles, unknown capabilities, malformed role output, and capability escalation must fail closed.
+- [ ] Secret-canary tests covering the Team OS ledger, role/meeting records, structured task evidence, and logs.
+- [ ] An action inventory tied to actual registered tool handlers, including file writes, patching, browser mutations, config/permission changes, deployments, signing, spending, and external publication.
+- [ ] Current-head test evidence for all applicable candidates above, including skipped tests and environment limitations.
+
+**Phase 0 remains IN_PROGRESS.** These mappings narrow the verification work; they do not satisfy the exit gate by themselves.
