@@ -51,11 +51,21 @@ def _initialize(conn: sqlite3.Connection) -> None:
         for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     }
     if existing_tables:
-        if "ledger_meta" not in existing_tables:
-            raise TaskLedgerError("Refusing to initialize a database owned by another application.")
+        if not {"ledger_meta", "tasks", "task_dependencies", "task_events"}.issubset(existing_tables):
+            raise TaskLedgerError("Refusing to initialize a database not owned by the local task ledger.")
+        meta_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(ledger_meta)")
+        }
+        if not {"key", "value"}.issubset(meta_columns):
+            raise TaskLedgerError("Refusing to mutate an unrecognized ledger metadata table.")
         backend = conn.execute(
             "SELECT value FROM ledger_meta WHERE key = 'task_backend'"
         ).fetchone()
+        schema = conn.execute(
+            "SELECT value FROM ledger_meta WHERE key = 'schema_version'"
+        ).fetchone()
+        if backend is None and schema is None:
+            raise TaskLedgerError("Refusing to initialize a database with unrecognized ledger metadata.")
         if backend is not None and backend["value"] != "local_sqlite":
             raise TaskLedgerError(
                 f"Task backend is {backend['value']!r}; refusing to mutate the local SQLite fallback ledger."
