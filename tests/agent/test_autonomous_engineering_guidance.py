@@ -1,7 +1,7 @@
 """Tests for the default autonomous engineering guidance."""
 from types import SimpleNamespace
 
-import agent.system_prompt as system_prompt
+from agent import system_prompt
 
 
 def _agent(**overrides):
