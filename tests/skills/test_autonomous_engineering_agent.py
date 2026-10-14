@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -83,6 +84,34 @@ def test_block_requires_reason_and_can_be_unblocked(db_path: Path) -> None:
     blocked = ledger.transition_task(db_path, task["task_id"], "BLOCKED", "Waiting for runner")
     assert blocked["blocked_reason"] == "Waiting for runner"
     assert ledger.transition_task(db_path, task["task_id"], "PENDING")["status"] == "PENDING"
+
+
+def test_refuses_foreign_database_without_mutating_it(tmp_path: Path) -> None:
+    db_path = tmp_path / "application.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE application_state (value TEXT NOT NULL)")
+        conn.execute("INSERT INTO application_state(value) VALUES ('preserve me')")
+    before = db_path.read_bytes()
+
+    with pytest.raises(ledger.TaskLedgerError, match="owned by another application"):
+        ledger.create_task(db_path, "Do not touch foreign DB")
+
+    assert db_path.read_bytes() == before
+
+
+def test_refuses_non_local_backend_without_mutating_it(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE ledger_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("INSERT INTO ledger_meta(key, value) VALUES ('task_backend', 'kanban')")
+        conn.execute("CREATE TABLE existing_state (value TEXT NOT NULL)")
+        conn.execute("INSERT INTO existing_state(value) VALUES ('preserve me')")
+    before = db_path.read_bytes()
+
+    with pytest.raises(ledger.TaskLedgerError, match="refusing to mutate"):
+        ledger.create_task(db_path, "Do not dual-write task state")
+
+    assert db_path.read_bytes() == before
 
 
 def test_project_state_path_cannot_escape_project(tmp_path: Path) -> None:
