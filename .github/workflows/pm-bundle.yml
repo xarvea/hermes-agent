@@ -7,9 +7,10 @@ name: PM Bundle
 # boots hermes_cli out of the payload with no network and no PYTHONPATH —
 # as a pre-merge check for the pm tooling itself.
 #
-# Staging is native per target (no cross-target wheel tables anywhere):
-# the runner IS the target. pm's arch guard fails the job if any staged
-# mismatches, before anything ships.
+# Staging is native per target (no cross-target wheel tables anywhere).
+# Linux bundle legs remain disabled until a standard runner image satisfies
+# the payload's GLIBC_2.38 requirement; Windows ARM64 remains disabled until
+# a native ARM64 runner is available.
 
 on:
   workflow_dispatch:
