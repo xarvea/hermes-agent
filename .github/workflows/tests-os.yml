@@ -12,7 +12,7 @@ name: OS-specific tests
 # is where those markers actually execute:
 #
 #   macos    → ``-m platforms``    on macos-latest
-#   windows  → ``-m platforms``    on windows-latest and windows-latest
+#   windows  → ``-m platforms``    on windows-latest
 #
 # (tests/conftest.py's ``pytest_collection_modifyitems`` hook skips
 # foreign-OS ``platforms(...)`` markers on each host, so one shared ``-m
@@ -95,20 +95,11 @@ jobs:
           - name: Windows-only tests
             runner: windows-latest
             marker: windows
-          - name: Windows-only tests (arm64)
-            runner: windows-latest
-            marker: windows
-            timeout: 60
     steps:
       - name: Checkout code
         uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
           ref: ${{ inputs.commit }}
-
-      # No arm64 wheels for some of the extras below: PM builds them from sdist.
-      - name: Set up native ARM64 build dependencies
-        if: runner.os == 'Windows' && runner.arch == 'ARM64'
-        uses: ./.github/actions/setup-windows-build-deps
 
       - name: Set up locked Python and test dependencies
         uses: ./.github/actions/setup-pm
