@@ -68,8 +68,8 @@ The task ledger is deliberately not an execution sandbox, policy engine, or agen
 
 - [x] Add an end-to-end engineering workflow skill.
 - [x] Add a standard-library SQLite task ledger with dependency gates and evidence-required completion.
-- [ ] Add runtime-state ignore rule.
-- [ ] Add focused automated tests and run them in the repository environment.
+- [x] Add runtime-state ignore rule.
+- [x] Add focused automated tests.\n- [ ] Run focused automated tests in the repository environment.
 - [ ] Add task ledger CLI integration documentation and examples.
 
 ### Phase 2 — Runtime integration
