@@ -73,7 +73,7 @@ The task ledger is deliberately not an execution sandbox, policy engine, or agen
 - [x] Add runtime-state ignore rule.
 - [x] Add focused automated tests.
 - [ ] Run focused automated tests in the repository environment.
-- [ ] Add task ledger CLI integration documentation and examples.
+- [x] Add task ledger CLI integration documentation and examples.
 
 ### Phase 2 — Runtime integration
 
