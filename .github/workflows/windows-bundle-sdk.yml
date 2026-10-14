@@ -24,12 +24,13 @@ jobs:
   windows-bundle-tools:
     name: Cold Windows SDK (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    # Cold ARM64 npm extraction alone can exceed 15 minutes on the hosted runner.
+    # Only x64 hosted runners are available for this private repository.
+    # Keep one cold-cache pass; ARM64-specific SDK validation is not claimed.
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-latest, windows-latest]
+        runner: [windows-latest]
     steps:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
