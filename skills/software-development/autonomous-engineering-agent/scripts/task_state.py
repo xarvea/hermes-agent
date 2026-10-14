@@ -209,7 +209,7 @@ def transition_task(
     if target == "BLOCKED" and not details.strip():
         raise TaskLedgerError("Blocking a task requires a reason (--reason).")
 
-    with _connect(db_path) as conn:
+    with closing(_connect(db_path)) as conn, conn:
         _initialize(conn)
         conn.execute("BEGIN IMMEDIATE")
         try:
@@ -246,7 +246,7 @@ def transition_task(
 
 
 def get_task(db_path: Path, task_id: str) -> dict:
-    with _connect(db_path) as conn:
+    with closing(_connect(db_path)) as conn, conn:
         _initialize(conn)
         row = _task(conn, _validate_task_id(task_id))
         result = dict(row)
@@ -269,7 +269,7 @@ def get_task(db_path: Path, task_id: str) -> dict:
 
 
 def list_tasks(db_path: Path) -> list[dict]:
-    with _connect(db_path) as conn:
+    with closing(_connect(db_path)) as conn, conn:
         _initialize(conn)
         rows = conn.execute(
             """SELECT task_id, title, description, status, created_at, updated_at,
@@ -323,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         db_path = _db_path(args.project_root, args.state_file)
         if args.command == "init":
-            with _connect(db_path) as conn:
+            with closing(_connect(db_path)) as conn, conn:
                 _initialize(conn)
             result = {"state": "initialized", "database": str(db_path)}
         elif args.command == "create":
