@@ -70,6 +70,20 @@ def _initialize(conn: sqlite3.Connection) -> None:
             raise TaskLedgerError(
                 f"Task backend is {backend['value']!r}; refusing to mutate the local SQLite fallback ledger."
             )
+        if backend is not None and schema is None:
+            raise TaskLedgerError(
+                "Refusing to mutate a local ledger with incomplete schema metadata."
+            )
+        if schema is not None:
+            try:
+                schema_version = int(schema["value"])
+            except (TypeError, ValueError) as exc:
+                raise TaskLedgerError("Refusing to mutate a ledger with invalid schema metadata.") from exc
+            if schema_version != SCHEMA_VERSION:
+                raise TaskLedgerError(
+                    f"Unsupported ledger schema {schema['value']}; expected {SCHEMA_VERSION}. "
+                    "Back up the database and run a supported migration."
+                )
 
     conn.executescript(
         """

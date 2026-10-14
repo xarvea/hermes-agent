@@ -133,6 +133,33 @@ def test_refuses_non_local_backend_without_mutating_it(tmp_path: Path) -> None:
     assert db_path.read_bytes() == before
 
 
+def test_unsupported_schema_is_rejected_before_schema_mutation(db_path: Path) -> None:
+    task = ledger.create_task(db_path, "Existing task")
+    assert task["status"] == "PENDING"
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DROP INDEX idx_tasks_status")
+        conn.execute(
+            "UPDATE ledger_meta SET value = '999' WHERE key = 'schema_version'"
+        )
+
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_status'"
+        ).fetchone() is None
+
+    with pytest.raises(ledger.TaskLedgerError, match="Unsupported ledger schema 999"):
+        ledger.create_task(db_path, "Must not mutate unsupported schema")
+
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT value FROM ledger_meta WHERE key = 'schema_version'"
+        ).fetchone()[0] == "999"
+        assert conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_status'"
+        ).fetchone() is None
+
+
 def test_project_state_path_cannot_escape_project(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
