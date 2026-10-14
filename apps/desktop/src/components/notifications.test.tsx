@@ -69,6 +69,7 @@ describe('toast titles', () => {
     notify({ id: 'window-gone', message: 'Temporary notification', durationMs: 0 })
 
     vi.stubGlobal('window', undefined)
+
     try {
       expect(() => dismissNotification('window-gone')).not.toThrow()
     } finally {
