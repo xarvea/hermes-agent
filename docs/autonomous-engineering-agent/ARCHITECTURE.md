@@ -68,7 +68,7 @@ The task ledger is deliberately not an execution sandbox, policy engine, or agen
 ### Phase 1 — Workflow and durable state foundation
 
 - [x] Add an end-to-end engineering workflow skill.
-- [x] Inject default-on, tool-gated engineering guidance into the stable system prompt.
+- [x] Inject default-on, tool-gated engineering guidance into the stable system prompt.\n- [x] Refresh prompt-surface snapshots and token counts.
 - [x] Add a standard-library SQLite task ledger with dependency gates and evidence-required completion.
 - [x] Add runtime-state ignore rule.
 - [x] Add focused automated tests.
@@ -79,7 +79,7 @@ The task ledger is deliberately not an execution sandbox, policy engine, or agen
 
 - [ ] Prove when/how the skill is selected for ordinary engineering requests.
 - [ ] Connect task state to the existing task/todo/delegation surfaces without duplicate competing sources of truth.
-- [ ] Add resume-on-session-start behavior using persisted project state.
+- [x] Add read-only resume-on-session-start context from persisted project state.
 - [ ] Add explicit iteration/time/tool-call budgets and safe stop conditions.
 - [ ] Preserve prompt-cache, message-role, profile-isolation, and tool registration invariants.
 
