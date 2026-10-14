@@ -726,6 +726,26 @@ def _context_files_part(agent: Any, ctx_len: Optional[int], soul_loaded: bool) -
         allow_install_tree_fallback=agent.platform in ("cli", "tui"), home_override=_agent_home(agent))]
 
 
+
+def _engineering_task_context_part(agent: Any) -> list[str]:
+    """Read active project task state once at session prompt-build time for automatic resume."""
+    if getattr(agent, "skip_context_files", False):
+        return []
+    try:
+        cwd = resolve_context_cwd() or resolve_agent_cwd()
+        if not cwd:
+            return []
+        cwd_path = Path(cwd).resolve()
+        project_root = _pb._find_git_root(cwd_path) or cwd_path
+        from agent.engineering_task_context import load_active_tasks
+
+        block = load_active_tasks(project_root)
+        return [block] if block else []
+    except OSError:
+        logger.debug("Engineering task context could not resolve the active project", exc_info=True)
+        return []
+
+
 def _join_tier(parts: list[Optional[str]]) -> str:
     """Join non-empty parts; None/blank entries are dropped."""
     return "\n\n".join(p.strip() for p in parts if p and p.strip())
@@ -771,6 +791,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     if system_message is not None:
         context_parts.append(system_message)
     context_parts.extend(_context_files_part(agent, _ctx_len, _soul_loaded))
+    context_parts.extend(_engineering_task_context_part(agent))
     if coding_workspace_parts:
         context_parts.extend([*coding_workspace_parts, *coding_trailing_parts, *post_workspace_parts])
     else:
