@@ -25,9 +25,9 @@ Owns model/provider routing, conversation/session lifecycle, tools, terminal and
 
 ### 2. Engineering Team OS — control plane
 
-Owns project lifecycle, role registry, CTO planning, research records, structured meetings, decision records, task graph, bounded scheduler, execution budgets, policy decisions, verification contracts, checkpoints, recovery, and audit events.
+Owns project lifecycle, role registry, CTO planning, research records, structured meetings, decision records, task planning/coordination, execution budgets, policy decisions, verification contracts, checkpoints, recovery, and audit events. The task backend is selected explicitly per project run; native Kanban is preferred where available, with the local SQLite ledger as a bounded fallback. See [ADR-0001](./decisions/ADR-0001-native-kanban-task-backend.md).
 
-It orchestrates Hermes capabilities; it does not replace the model runtime or assume that prompt instructions alone enforce security.
+It orchestrates Hermes capabilities; it does not replace the model runtime or assume that prompt instructions alone enforce security. It must reuse native Kanban's task graph and dispatcher rather than implement a competing scheduler.
 
 ### 3. Project workspace — delivery plane
 
@@ -108,12 +108,13 @@ Required decision record fields: ID, status, date, context, options, selected op
 
 ## Task graph and execution contract
 
-- One source of truth for task state, dependencies, execution ownership, events, checkpoints, and verification evidence.
+- Exactly one selected backend is authoritative for task state, dependencies, execution ownership, and task transitions for a project run. Native Kanban is preferred where available; the project-local SQLite ledger is a bounded fallback. Never dual-write or silently synchronize two task databases. See ADR-0001.
+- Keep planning artifacts (requirements, research, ADRs, threat model, meeting records) in version-controlled project docs; do not mirror them into task status fields.
 - A task cannot start until all dependencies are completed.
 - A task cannot be marked completed without passing its declared verification contract and recording evidence.
 - Tasks have explicit inputs, outputs, owner role, workspace/files it may modify, dependencies, risk class, budget, retry limit, and acceptance criteria.
 - Parallel tasks require independent work boundaries or explicit coordination. Conflicting file ownership or shared interface changes must be serialized or mediated through a contract/merge task.
-- The scheduler advances to the next unblocked task automatically within a bounded global and per-task budget.
+- Use the selected backend's scheduler/dispatcher. For Kanban-backed runs, extend and reuse Kanban Swarm/dispatcher rather than implementing a second scheduler. For local-ledger fallback, execute only within explicit bounded local orchestration and report when distributed dispatch/recovery is unavailable.
 - Failures are classified; retries are limited and hypothesis-driven. No infinite retry or meeting loops.
 - Before resuming, inspect the current working tree and actual artifacts; persisted state is a recovery hint, not proof that an action completed.
 - Non-idempotent actions require durable intent/result recording and reconciliation before retry.
@@ -152,8 +153,9 @@ Log structured events with task/meeting/role IDs, status transition, duration, b
 
 ### Phase 2 — Role registry and runtime integration
 - Define typed role contracts, capabilities, toolsets, budgets, output validation, and delegation mapping.
-- Integrate with native delegation/todo/kanban only after identifying their source-of-truth semantics.
-- Add bounded scheduler/auto-advance, cancellation, concurrency limits, and safe stop conditions.
+- Implement the task-backend interface and explicit selection from ADR-0001; native Kanban is preferred, and local SQLite is fallback only.
+- Integrate with native delegation and Kanban Swarm/dispatcher without competing task state; treat native todo as a view/projection.
+- Reuse existing concurrency, cancellation, spawn-depth, and iteration controls; add only missing bounded controls.
 - **Exit gate:** roles dispatch deterministically; invalid output, permission escalation, and budget exhaustion are handled safely.
 
 ### Phase 3 — CTO planner and research
@@ -166,7 +168,8 @@ Log structured events with task/meeting/role IDs, status transition, duration, b
 - **Exit gate:** meetings produce structured decision records and measurable changes to the plan, not unstructured transcripts alone.
 
 ### Phase 5 — Execution orchestration
-- Schedule dependent and independent work, isolate workspaces/branches where needed, protect shared contracts, checkpoint, auto-advance, and resume.
+- Integrate role-aware execution with native Kanban Swarm and dispatcher; extend the existing task graph, root blackboard, verifier gate, and synthesizer only where evidence identifies missing contracts.
+- Isolate workspaces/branches where needed, protect shared contracts, checkpoint, auto-advance, and resume using the selected backend.
 - **Exit gate:** multi-role tasks complete across process/session interruption without duplicate competing state or uncontrolled file conflicts.
 
 ### Phase 6 — Deterministic safety, QA, and recovery
@@ -203,7 +206,7 @@ The Team OS is not production-ready until it demonstrates:
 - No unbounded autonomous execution or hidden background activity.
 - No automatic production deployment, financial transaction, signing, or destructive operation.
 - No promise of zero defects or universal compatibility with every project type.
-- No replacement of Hermes runtime, memory, or native delegation unless evidence proves a specific gap cannot be solved at the existing seams.
+- No replacement of Hermes runtime, memory, native delegation, Kanban task graph, or dispatcher unless evidence proves a specific gap cannot be solved at the existing seams.
 
 ## Change management
 
