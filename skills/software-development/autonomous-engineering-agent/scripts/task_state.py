@@ -41,11 +41,25 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 10000")
-    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
 def _initialize(conn: sqlite3.Connection) -> None:
+    existing_tables = {
+        row["name"]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    if existing_tables:
+        if "ledger_meta" not in existing_tables:
+            raise TaskLedgerError("Refusing to initialize a database owned by another application.")
+        backend = conn.execute(
+            "SELECT value FROM ledger_meta WHERE key = 'task_backend'"
+        ).fetchone()
+        if backend is not None and backend["value"] != "local_sqlite":
+            raise TaskLedgerError(
+                f"Task backend is {backend['value']!r}; refusing to mutate the local SQLite fallback ledger."
+            )
+
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS ledger_meta (
@@ -95,17 +109,11 @@ def _initialize(conn: sqlite3.Connection) -> None:
             f"Unsupported ledger schema {existing['value']}; expected {SCHEMA_VERSION}. "
             "Back up the database and run a supported migration."
         )
-    backend = conn.execute(
-        "SELECT value FROM ledger_meta WHERE key = 'task_backend'"
-    ).fetchone()
     if backend is None:
         conn.execute(
             "INSERT INTO ledger_meta(key, value) VALUES ('task_backend', 'local_sqlite')"
         )
-    elif backend["value"] != "local_sqlite":
-        raise TaskLedgerError(
-            f"Task backend is {backend['value']!r}; refusing to mutate the local SQLite fallback ledger."
-        )
+    conn.execute("PRAGMA journal_mode = WAL")
 
 
 def _validate_task_id(task_id: str) -> str:
