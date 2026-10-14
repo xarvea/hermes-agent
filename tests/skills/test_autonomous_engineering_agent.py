@@ -99,6 +99,22 @@ def test_refuses_foreign_database_without_mutating_it(tmp_path: Path) -> None:
     assert db_path.read_bytes() == before
 
 
+def test_refuses_unrecognized_ledger_metadata_without_mutating_it(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE ledger_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("INSERT INTO ledger_meta(key, value) VALUES ('application_version', '1')")
+        conn.execute("CREATE TABLE tasks (value TEXT NOT NULL)")
+        conn.execute("CREATE TABLE task_dependencies (value TEXT NOT NULL)")
+        conn.execute("CREATE TABLE task_events (value TEXT NOT NULL)")
+    before = db_path.read_bytes()
+
+    with pytest.raises(ledger.TaskLedgerError, match="unrecognized ledger metadata"):
+        ledger.create_task(db_path, "Do not claim foreign state")
+
+    assert db_path.read_bytes() == before
+
+
 def test_refuses_non_local_backend_without_mutating_it(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     with sqlite3.connect(db_path) as conn:
