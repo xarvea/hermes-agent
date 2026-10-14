@@ -73,7 +73,11 @@ jobs:
         shell: bash
         run: |
           case "$TARGET" in
-            darwin/arm64/dmg|darwin/x64/dmg|darwin/arm64/zip|darwin/x64/zip|win32/arm64/msix|win32/x64/msix|win32/arm64/msixbundle|win32/x64/msixbundle) ;;
+            win32/arm64/msix|win32/arm64/msixbundle)
+              echo "::error::Windows ARM64 native smoke is blocked: this workflow runs on windows-latest (x64). Use a verified native ARM64 runner before claiming ARM64 install/chat validation."
+              exit 1
+              ;;
+            darwin/arm64/dmg|darwin/x64/dmg|darwin/arm64/zip|darwin/x64/zip|win32/x64/msix|win32/x64/msixbundle) ;;
             *) echo '::error::unsupported native smoke target'; exit 1 ;;
           esac
 
