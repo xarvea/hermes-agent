@@ -34,7 +34,7 @@ The task ledger uses Python's standard library only. It is stored under the proj
 
 1. Resolve the project root and read applicable instructions.
 2. Initialize the task ledger:
-   `python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . init`
+   `python <resolved-skill-script-path> --project-root . init`
 3. Create and maintain tasks as the plan evolves. Use one task per independently verifiable outcome.
 4. Execute the loop in **Procedure** until all acceptance criteria pass or a specific blocker is recorded.
 
@@ -47,17 +47,17 @@ The task ledger uses Python's standard library only. It is stored under the proj
 - Never mark a task complete because code was written or a command was merely proposed.
 - The ledger records workflow state; it is not a sandbox or a security boundary.
 
-Common commands (run from the repository root):
+Common commands (run from the target project's root; replace `<resolved-skill-script-path>` with the actual installed path obtained from the skill tools):
 
 ```text
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . init
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . create --title "Define API contract" --description "Document endpoints and acceptance tests"
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . list
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . start TASK_ID
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . block TASK_ID --reason "Waiting for provider credentials"
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . unblock TASK_ID
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . complete TASK_ID --evidence "pytest: 18 passed; build: PASS"
-python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . show TASK_ID
+python <resolved-skill-script-path> --project-root . init
+python <resolved-skill-script-path> --project-root . create --title "Define API contract" --description "Document endpoints and acceptance tests"
+python <resolved-skill-script-path> --project-root . list
+python <resolved-skill-script-path> --project-root . start TASK_ID
+python <resolved-skill-script-path> --project-root . block TASK_ID --reason "Waiting for provider credentials"
+python <resolved-skill-script-path> --project-root . unblock TASK_ID
+python <resolved-skill-script-path> --project-root . complete TASK_ID --evidence "pytest: 18 passed; build: PASS"
+python <resolved-skill-script-path> --project-root . show TASK_ID
 ```
 
 Create dependent tasks with repeated `--depends-on TASK_ID` options. Do not store secret values in task descriptions, reasons, or evidence.
