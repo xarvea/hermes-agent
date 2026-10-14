@@ -341,7 +341,9 @@ export function notifyError(
 }
 
 function clearNotificationTimer(timer: number | undefined) {
-  if (timer === undefined) return
+  if (timer === undefined) {
+    return
+  }
 
   // A notification timer can fire while a renderer test environment is being
   // torn down. In that case `window` no longer exists, but the timer still
