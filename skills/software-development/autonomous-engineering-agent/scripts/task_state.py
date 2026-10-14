@@ -305,8 +305,8 @@ def _parser() -> argparse.ArgumentParser:
     create.add_argument("--depends-on", action="append", default=[], dest="dependencies")
     show = sub.add_parser("show", help="Show task, dependencies and event history.")
     show.add_argument("task_id")
-    for name, target in (("start", "IN_PROGRESS"), ("unblock", "PENDING"), ("complete", "COMPLETED"), ("block", "BLOCKED"), ("fail", "FAILED")):
-        command = sub.add_parser(name, help=f"Move a task to {target}.")
+    for name in ("start", "unblock", "complete", "block", "fail"):
+        command = sub.add_parser(name, help=f"Move a task to {name}.")
         command.add_argument("task_id")
         if target == "COMPLETED":
             command.add_argument("--evidence", required=True, help="Test or verification evidence.")
@@ -314,7 +314,6 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--reason", required=True)
         else:
             command.add_argument("--details", default="")
-        command.set_defaults(target_status=target)
     return parser
 
 
@@ -322,11 +321,6 @@ def _initialize_ledger(db_path: Path) -> dict:
     with closing(_connect(db_path)) as conn, conn:
         _initialize(conn)
     return {"state": "initialized", "database": str(db_path)}
-
-
-def _transition_from_args(db_path: Path, args: argparse.Namespace) -> dict:
-    details = getattr(args, "evidence", getattr(args, "reason", getattr(args, "details", "")))
-    return transition_task(db_path, args.task_id, args.target_status, details)
 
 
 def _dispatch(args: argparse.Namespace, db_path: Path) -> dict | list[dict]:
