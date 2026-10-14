@@ -12,7 +12,7 @@ import json
 import sqlite3
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -32,7 +32,7 @@ class TaskLedgerError(Exception):
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
@@ -318,23 +318,37 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _initialize_ledger(db_path: Path) -> dict:
+    with closing(_connect(db_path)) as conn, conn:
+        _initialize(conn)
+    return {"state": "initialized", "database": str(db_path)}
+
+
+def _transition_from_args(db_path: Path, args: argparse.Namespace) -> dict:
+    details = getattr(args, "evidence", getattr(args, "reason", getattr(args, "details", "")))
+    return transition_task(db_path, args.task_id, args.target_status, details)
+
+
+def _dispatch(args: argparse.Namespace, db_path: Path) -> dict | list[dict]:
+    handlers = {
+        "init": lambda: _initialize_ledger(db_path),
+        "create": lambda: create_task(db_path, args.title, args.description, args.dependencies),
+        "list": lambda: list_tasks(db_path),
+        "show": lambda: get_task(db_path, args.task_id),
+        "start": lambda: transition_task(db_path, args.task_id, "IN_PROGRESS", args.details),
+        "unblock": lambda: transition_task(db_path, args.task_id, "PENDING", args.details),
+        "complete": lambda: transition_task(db_path, args.task_id, "COMPLETED", args.evidence),
+        "block": lambda: transition_task(db_path, args.task_id, "BLOCKED", args.reason),
+        "fail": lambda: transition_task(db_path, args.task_id, "FAILED", args.details),
+    }
+    return handlers[args.command]()
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         db_path = _db_path(args.project_root, args.state_file)
-        if args.command == "init":
-            with closing(_connect(db_path)) as conn, conn:
-                _initialize(conn)
-            result = {"state": "initialized", "database": str(db_path)}
-        elif args.command == "create":
-            result = create_task(db_path, args.title, args.description, args.dependencies)
-        elif args.command == "list":
-            result = list_tasks(db_path)
-        elif args.command == "show":
-            result = get_task(db_path, args.task_id)
-        else:
-            details = getattr(args, "evidence", getattr(args, "reason", getattr(args, "details", "")))
-            result = transition_task(db_path, args.task_id, args.target_status, details)
+        result = _dispatch(args, db_path)
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
     except (TaskLedgerError, sqlite3.Error, OSError, ValueError) as exc:
