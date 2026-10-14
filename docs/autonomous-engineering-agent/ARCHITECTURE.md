@@ -1,10 +1,10 @@
 # Autonomous Engineering Agent — Architecture and Delivery Plan
 
-> Canonical approved architecture for the multi-role engineering organization: [TEAM_OS_PLAN.md](./TEAM_OS_PLAN.md). The team architecture and phase order are locked as the baseline; implementation remains incremental and must satisfy each phase gate. Material changes require evidence and an ADR.
+> Canonical approved architecture for the multi-role engineering organization: [TEAM_OS_PLAN.md](./TEAM_OS_PLAN.md). The team architecture and phase order are locked as the baseline; implementation remains incremental and must satisfy each phase gate. Material changes require evidence and an ADR. Current runtime findings and open audit items: [PHASE0_RUNTIME_AUDIT.md](./PHASE0_RUNTIME_AUDIT.md).
 
 ## Status
 
-- Current phase: Phase 1 foundation; Phase 0 runtime audit is the next engineering activity
+- Current phase: Phase 0 runtime audit IN_PROGRESS; Phase 1 foundation exists but is NOT VERIFIED
 - Branch: `feat/autonomous-engineering-agent`
 - Overall readiness: **NOT VERIFIED** — this is an incremental foundation, not a production certification.
 - Runtime integration, CI execution, full agent-loop orchestration, and adversarial evaluation remain open.
