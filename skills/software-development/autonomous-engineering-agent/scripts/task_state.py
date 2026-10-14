@@ -45,6 +45,7 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 
 def _initialize(conn: sqlite3.Connection) -> None:
+    backend = None
     existing_tables = {
         row["name"]
         for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
