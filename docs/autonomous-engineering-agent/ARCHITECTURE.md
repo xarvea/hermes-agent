@@ -1,6 +1,6 @@
 # Autonomous Engineering Agent — Architecture and Delivery Plan
 
-> Canonical approved architecture for the multi-role engineering organization: [TEAM_OS_PLAN.md](./TEAM_OS_PLAN.md). The team architecture and phase order are locked as the baseline; implementation remains incremental and must satisfy each phase gate. Material changes require evidence and an ADR. Current runtime findings and open audit items: [PHASE0_RUNTIME_AUDIT.md](./PHASE0_RUNTIME_AUDIT.md).
+> Canonical approved architecture for the multi-role engineering organization: [TEAM_OS_PLAN.md](./TEAM_OS_PLAN.md). The team architecture and phase order are locked as the baseline; implementation remains incremental and must satisfy each phase gate. Material changes require evidence and an ADR. Current runtime findings and open audit items: [PHASE0_RUNTIME_AUDIT.md](./PHASE0_RUNTIME_AUDIT.md). The older checklist below tracks the initial single-agent foundation and is subordinate to the canonical Team OS phase plan.
 
 ## Status
 
@@ -56,7 +56,7 @@ The task ledger is deliberately not an execution sandbox, policy engine, or agen
 - Never store credentials, private keys, access tokens, or secret values in the ledger.
 - Runtime database files are ignored by Git and should be backed up only when required by the project's recovery policy.
 
-## Delivery phases
+## Initial foundation checklist (subordinate to TEAM_OS_PLAN.md)
 
 ### Phase 0 — Repository and threat-model audit
 
