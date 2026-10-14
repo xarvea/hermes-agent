@@ -32,19 +32,9 @@ on:
         required: false
         type: string
         default: ''
-  pull_request:
-    paths:
-      - 'pm/**'
-      - '!pm/**/*.md'
-      - 'scripts/bundles/**'
-      - 'scripts/ci/desktop_build_cache.py'
-      - '.github/actions/desktop-build-cache/**'
-      - 'scripts/windows-build-deps.ps1'
-      - 'scripts/build/windows-deps.ps1'
-      - '.github/actions/setup-windows-build-deps/**'
-      - 'uv.lock'
-      - 'pyproject.toml'
-      - '.github/workflows/pm-bundle.yml'
+  # Automatic PR validation is disabled for this Linux-only fork because
+  # the Linux bundle matrix is currently blocked by the GLIBC_2.38 mismatch.
+  # Manual dispatch and release workflow_call remain available.
 
 permissions:
   contents: read
