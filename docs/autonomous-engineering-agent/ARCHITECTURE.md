@@ -68,7 +68,8 @@ The task ledger is deliberately not an execution sandbox, policy engine, or agen
 ### Phase 1 — Workflow and durable state foundation
 
 - [x] Add an end-to-end engineering workflow skill.
-- [x] Inject default-on, tool-gated engineering guidance into the stable system prompt.\n- [x] Refresh prompt-surface snapshots and token counts.
+- [x] Inject default-on, tool-gated engineering guidance into the stable system prompt.
+- [x] Refresh prompt-surface snapshots and token counts.
 - [x] Add a standard-library SQLite task ledger with dependency gates and evidence-required completion.
 - [x] Add runtime-state ignore rule.
 - [x] Add focused automated tests.
