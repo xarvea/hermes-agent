@@ -120,6 +120,9 @@ def test_refuses_non_local_backend_without_mutating_it(tmp_path: Path) -> None:
     with sqlite3.connect(db_path) as conn:
         conn.execute("CREATE TABLE ledger_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         conn.execute("INSERT INTO ledger_meta(key, value) VALUES ('task_backend', 'kanban')")
+        conn.execute("CREATE TABLE tasks (value TEXT NOT NULL)")
+        conn.execute("CREATE TABLE task_dependencies (value TEXT NOT NULL)")
+        conn.execute("CREATE TABLE task_events (value TEXT NOT NULL)")
         conn.execute("CREATE TABLE existing_state (value TEXT NOT NULL)")
         conn.execute("INSERT INTO existing_state(value) VALUES ('preserve me')")
     before = db_path.read_bytes()
