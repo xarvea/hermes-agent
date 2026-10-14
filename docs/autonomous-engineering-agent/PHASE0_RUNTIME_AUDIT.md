@@ -47,7 +47,9 @@
 - Hermes also exposes Kanban task tools and dispatcher-owned worker context. The repository guidance distinguishes dispatcher-owned workers and native delegation context.
 - The current engineering foundation adds a project-local SQLite ledger at `.engineering-agent/state.sqlite3` for durable tasks, dependencies, transitions, events, and verification evidence.
 
-**Implication:** Phase 2 must choose and document one authoritative source for durable engineering task state. Do not silently synchronize two independently writable task databases. The native todo can be a projection/view. If the Kanban dispatcher is selected as the authority, implement an explicit adapter and define which fields/events the SQLite ledger owns; otherwise retain SQLite as authority and integrate through a narrow, tested adapter. The decision is pending evidence from the complete Kanban persistence/lifecycle path.
+**Decision:** [ADR-0001](./decisions/ADR-0001-native-kanban-task-backend.md) selects native Kanban as the preferred durable task graph/dispatch backend when available, with the project-local SQLite ledger as a bounded fallback only. A project run must select exactly one authoritative backend; no dual-write or silent synchronization is permitted. Kanban Swarm v1 already supplies a root/shared blackboard, parallel worker tasks, a verifier gate, a synthesizer dependency, and idempotent topology recovery. The remaining work is to verify the complete lifecycle and implement a typed adapter without duplicating the dispatcher.
+
+**Implication:** Phase 2 must implement explicit backend selection and adapt Team OS contracts to Kanban task/link/event/run semantics. Native todo remains a view/projection, not durable authority.
 
 ### Repository contribution constraints
 
@@ -75,7 +77,8 @@
 
 ## Open audit items
 
-- [ ] Read the complete Kanban persistence and dispatcher lifecycle; determine whether it should be the durable task authority or an adapter target.
+- [x] Inspect Kanban task schema, transaction/claim model, dispatcher lifecycle overview, and Swarm v1 topology; ADR-0001 selects Kanban as the preferred backend.
+- [ ] Verify full Kanban lifecycle integration and adapter contracts with focused tests.
 - [ ] Map all tool execution paths that can mutate files, start background work, change config, access credentials, deploy, or initiate financial/privileged actions.
 - [ ] Verify existing guardrail configuration, approval transport, and subagent policy under CLI, gateway, and unattended execution contexts.
 - [ ] Confirm whether role/capability metadata can be passed through native delegation without changing its public contract.
