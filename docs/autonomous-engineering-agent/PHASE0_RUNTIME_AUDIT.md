@@ -29,7 +29,7 @@
 - Per-child `max_iterations`, concurrency, spawn depth, and timeout settings already exist. Timeout defaults and semantics are progress/inactivity based, not a hard global project deadline.
 - Background delegation is process-local. The documented contract says durable work across process restart requires a different persistence mechanism; a background delegation result alone is not durable workflow state.
 
-**Implication:** Use native delegation for execution workers, but build the Team OS scheduler and persistent task/meeting state outside the child process lifecycle. Do not assume native delegation already supplies CTO/product/security role semantics or crash-resumable orchestration.
+**Implication:** Native delegation and Kanban dispatch have different ownership contracts. Durable execution roles must be dispatched by the Kanban Swarm/dispatcher when Kanban is authoritative; use native delegation only for bounded work that does not own or mutate a Kanban task. [ADR-0002](./decisions/ADR-0002-role-dispatch-and-kanban-ownership.md) records this boundary. Do not assume native delegation already supplies CTO/product/security role semantics or crash-resumable orchestration.
 
 ### Existing authorization and terminal guards
 
@@ -87,7 +87,7 @@ The source-level action map is maintained in [PHASE0_ACTION_ENFORCEMENT_MATRIX.m
 - [ ] Verify full Kanban lifecycle integration and adapter contracts with focused tests.
 - [ ] Complete the action-class inventory in [PHASE0_ACTION_ENFORCEMENT_MATRIX.md](./PHASE0_ACTION_ENFORCEMENT_MATRIX.md) against the enabled tool registry and handler call paths; then verify each applicable enforcement point with focused negative tests.
 - [ ] Verify existing guardrail configuration, approval transport, and subagent policy under CLI, gateway, and unattended execution contexts.
-- [ ] Confirm whether role/capability metadata can be passed through native delegation without changing its public contract.
+- [ ] Verify the role-dispatch boundary in [ADR-0002](./decisions/ADR-0002-role-dispatch-and-kanban-ownership.md) with tests; do not expand native delegation's public contract or grant Kanban ownership to delegate children.
 - [ ] Run focused tests using `scripts/run_tests.sh` in the repository-prescribed test environment.
 - [ ] Add contract tests for Team OS ↔ native delegation/task/approval seams before implementing the scheduler.
 - [ ] Finalize the threat-model acceptance matrix and close Phase 0 only after evidence is recorded.
