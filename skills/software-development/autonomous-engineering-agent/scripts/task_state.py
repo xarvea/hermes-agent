@@ -7,6 +7,7 @@ state and verification evidence; it does not execute commands or grant permissio
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import sqlite3
 import sys
@@ -166,7 +167,7 @@ def create_task(
     dependency_ids = sorted({_validate_task_id(item) for item in dependencies})
     task_id = uuid.uuid4().hex[:12]
     now = _now()
-    with _connect(db_path) as conn:
+    with closing(_connect(db_path)) as conn, conn:
         _initialize(conn)
         conn.execute("BEGIN IMMEDIATE")
         try:
