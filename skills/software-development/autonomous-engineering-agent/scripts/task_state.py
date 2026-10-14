@@ -95,6 +95,17 @@ def _initialize(conn: sqlite3.Connection) -> None:
             f"Unsupported ledger schema {existing['value']}; expected {SCHEMA_VERSION}. "
             "Back up the database and run a supported migration."
         )
+    backend = conn.execute(
+        "SELECT value FROM ledger_meta WHERE key = 'task_backend'"
+    ).fetchone()
+    if backend is None:
+        conn.execute(
+            "INSERT INTO ledger_meta(key, value) VALUES ('task_backend', 'local_sqlite')"
+        )
+    elif backend["value"] != "local_sqlite":
+        raise TaskLedgerError(
+            f"Task backend is {backend['value']!r}; refusing to mutate the local SQLite fallback ledger."
+        )
 
 
 def _validate_task_id(task_id: str) -> str:
