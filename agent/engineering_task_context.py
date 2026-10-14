@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 import logging
 import sqlite3
 from pathlib import Path
@@ -30,7 +31,7 @@ def load_active_tasks(project_root: Path) -> str | None:
         if root not in db_path.parents or not db_path.is_file():
             return None
         uri = db_path.as_uri() + "?mode=ro"
-        with sqlite3.connect(uri, uri=True, timeout=0.5) as conn:
+        with closing(sqlite3.connect(uri, uri=True, timeout=0.5)) as conn, conn:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA query_only = ON")
             placeholders = ",".join("?" for _ in _ACTIVE_STATUSES)
