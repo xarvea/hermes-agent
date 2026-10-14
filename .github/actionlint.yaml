@@ -1,5 +1,1 @@
-# actionlint does not recognize this organization-provisioned Windows ARM64 runner label.
-# Keep only the non-standard label still used by architecture-specific jobs.
-self-hosted-runner:
-  labels:
-    - windows-latest-32-arm-core
+# No custom runner labels are required; workflows use standard GitHub-hosted runners.
