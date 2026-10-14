@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from agent.engineering_task_context import load_active_tasks
+import agent.system_prompt as system_prompt
 
 
 def _create_ledger(root: Path, rows: list[tuple[str, str, str, str, str]]) -> Path:
@@ -82,3 +83,18 @@ def test_corrupt_state_is_ignored_without_mutating_it(tmp_path: Path) -> None:
 
     assert load_active_tasks(tmp_path) is None
     assert db_path.read_bytes() == before
+
+
+def test_system_prompt_loads_active_tasks_for_the_current_project(monkeypatch, tmp_path: Path) -> None:
+    _create_ledger(
+        tmp_path,
+        [("resume-1", "Continue API integration", "IN_PROGRESS", "2026-10-14T10:00:00+00:00", "")],
+    )
+    monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: str(tmp_path))
+    monkeypatch.setattr(system_prompt, "resolve_agent_cwd", lambda: str(tmp_path))
+
+    parts = system_prompt._engineering_task_context_part(type("Agent", (), {"skip_context_files": False})())
+
+    assert len(parts) == 1
+    assert "Resumable Engineering Task State" in parts[0]
+    assert "Continue API integration" in parts[0]
