@@ -47,6 +47,21 @@ The task ledger uses Python's standard library only. It is stored under the proj
 - Never mark a task complete because code was written or a command was merely proposed.
 - The ledger records workflow state; it is not a sandbox or a security boundary.
 
+Common commands (run from the repository root):
+
+```text
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . init
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . create --title "Define API contract" --description "Document endpoints and acceptance tests"
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . list
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . start TASK_ID
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . block TASK_ID --reason "Waiting for provider credentials"
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . unblock TASK_ID
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . complete TASK_ID --evidence "pytest: 18 passed; build: PASS"
+python skills/software-development/autonomous-engineering-agent/scripts/task_state.py --project-root . show TASK_ID
+```
+
+Create dependent tasks with repeated `--depends-on TASK_ID` options. Do not store secret values in task descriptions, reasons, or evidence.
+
 ## Procedure
 
 ### 1. Discover and establish a baseline
