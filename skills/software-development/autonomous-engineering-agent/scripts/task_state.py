@@ -305,8 +305,15 @@ def _parser() -> argparse.ArgumentParser:
     create.add_argument("--depends-on", action="append", default=[], dest="dependencies")
     show = sub.add_parser("show", help="Show task, dependencies and event history.")
     show.add_argument("task_id")
-    for name in ("start", "unblock", "complete", "block", "fail"):
-        command = sub.add_parser(name, help=f"Move a task to {name}.")
+    actions = {
+        "start": "IN_PROGRESS",
+        "unblock": "PENDING",
+        "complete": "COMPLETED",
+        "block": "BLOCKED",
+        "fail": "FAILED",
+    }
+    for name, target in actions.items():
+        command = sub.add_parser(name, help=f"Move a task to {target}.")
         command.add_argument("task_id")
         if target == "COMPLETED":
             command.add_argument("--evidence", required=True, help="Test or verification evidence.")
