@@ -115,6 +115,17 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
+      - name: Block ARM64 native acceptance on a non-ARM64 runner
+        if: inputs.bundle-arch == 'arm64'
+        shell: pwsh
+        env:
+          REQUESTED_ARCH: ${{ inputs.bundle-arch }}
+          RUNNER_ARCH: ${{ runner.arch }}
+        run: |
+          if ($env:RUNNER_ARCH -ne 'ARM64') {
+            Write-Error "Windows ARM64 bundle acceptance is blocked: requested $env:REQUESTED_ARCH but this job runs on $env:RUNNER_ARCH. Do not claim native ARM64 install/update validation without a native ARM64 runner."
+            exit 1
+          }
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
           ref: ${{ inputs.commit || github.sha }}
