@@ -60,13 +60,13 @@ The task ledger is deliberately not an execution sandbox, policy engine, or agen
 
 - [x] Inspect repository structure and applicable engineering instructions.
 - [x] Create an isolated feature branch; do not change `main`.
-- [ ] Identify runtime seams for skill selection, project state, and task continuation.
+- [x] Identify the system-prompt guidance seam and project-local skill/task-state surfaces.\n- [ ] Verify automatic skill selection and task continuation at runtime.
 - [ ] Verify current tool permission and approval mechanisms.
 - [ ] Define threat model and acceptance test matrix.
 
 ### Phase 1 — Workflow and durable state foundation
 
-- [x] Add an end-to-end engineering workflow skill.
+- [x] Add an end-to-end engineering workflow skill.\n- [x] Inject default-on, tool-gated engineering guidance into the stable system prompt.
 - [x] Add a standard-library SQLite task ledger with dependency gates and evidence-required completion.
 - [x] Add runtime-state ignore rule.
 - [x] Add focused automated tests.\n- [ ] Run focused automated tests in the repository environment.
