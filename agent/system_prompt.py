@@ -560,10 +560,10 @@ def _guidance_parts(agent: Any) -> list[str]:
         parts += [
             text for flag, text in (
                 ("_task_completion_guidance", TASK_COMPLETION_GUIDANCE),
-                ("_autonomous_engineering_guidance", AUTONOMOUS_ENGINEERING_GUIDANCE),
                 ("_parallel_tool_call_guidance", PARALLEL_TOOL_CALL_GUIDANCE),
             ) if getattr(agent, flag, True)
         ]
+        parts.append(AUTONOMOUS_ENGINEERING_GUIDANCE)
     parts.append(_tool_guidance_block(agent))  # None/empty entries are dropped by _join_tier
     if not agent.valid_tool_names:
         return parts
