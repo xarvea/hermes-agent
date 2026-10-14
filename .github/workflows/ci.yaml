@@ -149,16 +149,13 @@ jobs:
       e2e_upgrade: ${{ needs.detect.outputs.e2e_upgrade == 'true' }}
       strict_acceptance: ${{ inputs.strict_acceptance || '' }}
 
-  # macOS + Windows lanes. The main `tests` lane above is Linux-only, and
-  # the OS-marked tests it collects are skipped there by design (see the
-  # `_OS_MARKS` comment in tests/conftest.py) — this is where they run.
-  # Gated on `python` and on each lane it consumes: desktop_updater is set by
-  # TypeScript-only changes too (the Electron marker / result readers), and with
-  # `python` alone those never reached the Windows hand-off tests below.
+  # This fork currently targets Linux/Ubuntu only. Keep the reusable
+  # cross-platform workflow in the repository for possible future use, but do
+  # not schedule macOS/Windows runners in this CI pipeline.
   tests-os:
-    name: OS-specific tests
+    name: OS-specific tests (disabled: Linux-only target)
     needs: detect
-    if: needs.detect.outputs.python == 'true' || needs.detect.outputs.desktop_updater == 'true' || needs.detect.outputs.e2e == 'true' || needs.detect.outputs.e2e_upgrade == 'true'
+    if: false
     uses: ./.github/workflows/tests-os.yml
     with:
       commit: ${{ inputs.commit }}
@@ -413,7 +410,6 @@ jobs:
     needs:
       - detect
       - tests
-      - tests-os
       - lint
       - js-tests
       - rust-tests
