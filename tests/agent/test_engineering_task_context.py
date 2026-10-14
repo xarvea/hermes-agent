@@ -7,11 +7,15 @@ from agent.engineering_task_context import load_active_tasks
 from agent import system_prompt
 
 
-def _create_ledger(root: Path, rows: list[tuple[str, str, str, str, str]]) -> Path:
+def _create_ledger(
+    root: Path, rows: list[tuple[str, str, str, str, str]], *, backend: str = "local_sqlite"
+) -> Path:
     state_dir = root / ".engineering-agent"
     state_dir.mkdir(parents=True, exist_ok=True)
     db_path = state_dir / "state.sqlite3"
     with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE ledger_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("INSERT INTO ledger_meta(key, value) VALUES ('task_backend', ?)", (backend,))
         conn.execute(
             """CREATE TABLE tasks (
                 task_id TEXT PRIMARY KEY,
@@ -72,6 +76,16 @@ def test_state_symlink_cannot_escape_project_root(tmp_path: Path) -> None:
         return
 
     assert load_active_tasks(project) is None
+
+
+def test_non_local_backend_state_is_not_loaded_as_sqlite_fallback(tmp_path: Path) -> None:
+    _create_ledger(
+        tmp_path,
+        [("kanban-1", "Kanban-owned task", "IN_PROGRESS", "2026-10-14T10:00:00+00:00", "")],
+        backend="kanban",
+    )
+
+    assert load_active_tasks(tmp_path) is None
 
 
 def test_corrupt_state_is_ignored_without_mutating_it(tmp_path: Path) -> None:
