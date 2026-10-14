@@ -736,6 +736,9 @@ jobs:
               --name "$TARGET" --root apps/desktop/release "${args[@]}"
           fi
 
+  # This leg may cross-build ARM64 artifacts from the standard x64 host.
+  # Native ARM64 execution/acceptance is separately blocked by
+  # desktop-bundle-smoke.yml until a verified ARM64 runner is available.
   build-win32-arm64-release:
     name: bundled win32-arm64
     if: >-
@@ -772,6 +775,7 @@ jobs:
     env: *win32-env
     steps: *win32-steps
 
+  # Cross-build only on windows-latest (x64); this is not native ARM64 validation.
   build-win32-arm64-commit:
     name: bundled win32-arm64 (commit)
     if: >-
