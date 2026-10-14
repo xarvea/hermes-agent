@@ -62,6 +62,10 @@
 
 **Implication:** Prefer extending the existing delegation, inline tool, task/kanban, approval, and test seams. Avoid a new core tool unless the audit proves an existing surface cannot provide the required behavior.
 
+## Action enforcement audit
+
+The source-level action map is maintained in [PHASE0_ACTION_ENFORCEMENT_MATRIX.md](./PHASE0_ACTION_ENFORCEMENT_MATRIX.md). It records current enforcement seams, known gaps, policy invariants, and required negative tests. Its status is source review only; it does not close any runtime-verification item by itself.
+
 ## Initial threat model
 
 | Threat | Required control |
@@ -81,7 +85,7 @@
 
 - [x] Inspect Kanban task schema, transaction/claim model, dispatcher lifecycle overview, and Swarm v1 topology; ADR-0001 selects Kanban as the preferred backend.
 - [ ] Verify full Kanban lifecycle integration and adapter contracts with focused tests.
-- [ ] Map all tool execution paths that can mutate files, start background work, change config, access credentials, deploy, or initiate financial/privileged actions.
+- [ ] Complete the action-class inventory in [PHASE0_ACTION_ENFORCEMENT_MATRIX.md](./PHASE0_ACTION_ENFORCEMENT_MATRIX.md) against the enabled tool registry and handler call paths; then verify each applicable enforcement point with focused negative tests.
 - [ ] Verify existing guardrail configuration, approval transport, and subagent policy under CLI, gateway, and unattended execution contexts.
 - [ ] Confirm whether role/capability metadata can be passed through native delegation without changing its public contract.
 - [ ] Run focused tests using `scripts/run_tests.sh` in the repository-prescribed test environment.
