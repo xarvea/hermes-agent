@@ -164,4 +164,3 @@ If any required condition is unmet, report the overall result as `BLOCKED`, `FAI
 ## Verification
 
 Before reporting completion, inspect the task ledger with `list` and verify each task's evidence. Summarize what changed, the checks actually run, failures and limitations, security/operational risks, and the exact next action if blocked.
-
