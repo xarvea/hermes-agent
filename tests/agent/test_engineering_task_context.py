@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from agent.engineering_task_context import load_active_tasks
-import agent.system_prompt as system_prompt
+from agent import system_prompt
 
 
 def _create_ledger(root: Path, rows: list[tuple[str, str, str, str, str]]) -> Path:
