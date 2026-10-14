@@ -39,6 +39,8 @@
 - `agent/tool_executor.py` applies tool scope, plugin pre-hooks, argument checks, and agent guardrails before dispatch.
 - Subagent dangerous-command approval is not automatically inherited from the parent thread; its behavior is controlled through explicit delegation configuration, and opt-in auto-approval is a material safety setting.
 
+**Additional distinction:** `agent/tool_guardrails.py` is a loop/progress guardrail controller (repeated tool calls and no-progress patterns), not a universal authorization engine. `agent/tool_executor.py` calls the guardrail before dispatch, but that does not imply every file write, browser action, connector operation, configuration mutation, deployment, or financial/privileged action has a human-approval gate. Terminal approval rules protect the command classes they recognize; action-specific coverage must be audited explicitly.
+
 **Implication:** Reuse the existing authorization and command-guard paths. Before adding a Team OS policy layer, map every action class to the current enforcement point and identify uncovered operations. Prompt instructions are not an enforcement boundary. Any new gate must not bypass, weaken, or duplicate existing hardline blocks.
 
 ### Existing task surfaces
