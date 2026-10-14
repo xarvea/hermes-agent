@@ -34,6 +34,11 @@ def load_active_tasks(project_root: Path) -> str | None:
         with closing(sqlite3.connect(uri, uri=True, timeout=0.5)) as conn, conn:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA query_only = ON")
+            backend = conn.execute(
+                "SELECT value FROM ledger_meta WHERE key = 'task_backend'"
+            ).fetchone()
+            if backend is None or backend["value"] != "local_sqlite":
+                return None
             placeholders = ",".join("?" for _ in _ACTIVE_STATUSES)
             rows = conn.execute(
                 f"""SELECT task_id, title, status, updated_at, blocked_reason
