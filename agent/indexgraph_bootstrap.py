@@ -12,7 +12,7 @@ import os
 import re
 import subprocess
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -24,6 +24,7 @@ from agent.indexgraph import (
     IndexStatus,
     project_id_for,
     stable_id,
+    utc_now,
 )
 
 PROVIDER_ID = "builtin-deterministic"
@@ -323,13 +324,20 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
     errors: list[str] = []
     total_bytes = 0
     for path in eligible:
-        candidate = (root / Path(*PurePosixPath(path).parts)).resolve(strict=False)
+        lexical_path = root / Path(*PurePosixPath(path).parts)
+        if any(
+            (root / Path(*PurePosixPath(path).parts[:index])).is_symlink()
+            for index in range(1, len(PurePosixPath(path).parts) + 1)
+        ):
+            excluded.append(path)
+            continue
+        candidate = lexical_path.resolve(strict=False)
         try:
             candidate.relative_to(root)
         except ValueError:
             excluded.append(path)
             continue
-        if candidate.is_symlink() or not candidate.is_file():
+        if not candidate.is_file():
             excluded.append(path)
             continue
         try:
@@ -416,6 +424,9 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
                     project_id, "package", path, package, fingerprints[path],
                     attributes={"specifier": specifier[:512], "declared_by": path},
                 )
+                package_node = GraphNode(
+                    **{**package_node.__dict__, "id": stable_id(project_id, "package", path, package, specifier)}
+                )
                 nodes.append(package_node)
                 edges.append(_edge(project_id, source_node, "declares_dependency", package_node, path, fingerprints[path]))
 
@@ -442,7 +453,7 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
             "max_total_bytes": policy.max_total_bytes,
             "excluded_dirs": sorted(policy.excluded_dirs),
         }, sort_keys=True).encode()),
-        last_success_at=__import__("datetime").datetime.now(__import__("datetime").UTC).isoformat(timespec="seconds"),
+        last_success_at=utc_now(),
         errors=tuple(errors),
     )
     return BootstrapReport(
