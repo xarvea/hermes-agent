@@ -385,8 +385,11 @@ def test_every_detect_output_a_lane_sets_is_consumed_by_some_job():
     ci = _yaml(".github/workflows/ci.yaml")
     text = json.dumps({k: v for k, v in ci["jobs"].items() if k != "detect"})
     # python_prod's only reader is the deferred Desktop E2E job (`if: false`, see ci.yaml).
+    # desktop_updater is intentionally dormant while tests-os is disabled
+    # for this Linux-only fork; it remains in the reusable cross-platform contract.
     unread = [k for k in ci["jobs"]["detect"]["outputs"]
-              if k not in ("event_name", "python_prod") and f"needs.detect.outputs.{k}" not in text]
+              if k not in ("event_name", "python_prod", "desktop_updater")
+              and f"needs.detect.outputs.{k}" not in text]
     assert unread == []
 
 
