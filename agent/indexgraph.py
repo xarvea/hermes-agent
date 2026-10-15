@@ -10,7 +10,7 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
@@ -50,7 +50,7 @@ class Confidence(str, Enum):
 
 def utc_now() -> str:
     """Return an ISO-8601 UTC timestamp."""
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def stable_id(*parts: str) -> str:
@@ -98,7 +98,7 @@ class IndexManifest:
         return record
 
     @classmethod
-    def from_record(cls, record: dict[str, Any]) -> "IndexManifest":
+    def from_record(cls, record: dict[str, Any]) -> IndexManifest:
         values = dict(record)
         values["status"] = IndexStatus(values["status"])
         values["errors"] = tuple(values.get("errors", ()))
@@ -126,7 +126,7 @@ class GraphNode:
         return record
 
     @classmethod
-    def from_record(cls, record: dict[str, Any]) -> "GraphNode":
+    def from_record(cls, record: dict[str, Any]) -> GraphNode:
         values = dict(record)
         values["confidence"] = Confidence(values["confidence"])
         return cls(**values)
@@ -152,7 +152,7 @@ class GraphEdge:
         return record
 
     @classmethod
-    def from_record(cls, record: dict[str, Any]) -> "GraphEdge":
+    def from_record(cls, record: dict[str, Any]) -> GraphEdge:
         values = dict(record)
         values["confidence"] = Confidence(values["confidence"])
         return cls(**values)
