@@ -808,9 +808,14 @@ def _reset_tui_gateway_server_state():
     # This finalizer can run before the test's own monkeypatch undo, so a
     # global may still be replaced with a non-dict test double — skip those
     # (monkeypatch restores the real, pre-test object afterwards anyway).
-    sessions = mod._sessions
-    if isinstance(sessions, dict):
-        _teardown_tui_server_sessions(mod)
+    # Another test may have observed the module during its import. In that
+    # state, server globals such as _sessions do not exist yet; teardown must
+    # leave the partially initialized module alone rather than masking the
+    # original import outcome with an AttributeError.
+    sessions = getattr(mod, "_sessions", None)
+    if not isinstance(sessions, dict):
+        return
+    _teardown_tui_server_sessions(mod)
     for name in (
         "_pending",
         "_pending_prompt_payloads",
