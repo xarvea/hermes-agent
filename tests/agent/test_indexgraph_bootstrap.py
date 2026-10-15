@@ -14,7 +14,7 @@ def test_bootstrap_is_deterministic_and_emits_confirmed_local_imports(tmp_path: 
     package = tmp_path / "src" / "pkg"
     package.mkdir(parents=True)
     (package / "__init__.py").write_text("", encoding="utf-8")
-    (package / "main.py").write_text("from .util import value\n", encoding="utf-8")
+    (package / "main.py").write_text("from .util import value\nfrom . import util\n", encoding="utf-8")
     (package / "util.py").write_text("value = 42\n", encoding="utf-8")
 
     first = build_index(tmp_path)
