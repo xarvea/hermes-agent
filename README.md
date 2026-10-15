@@ -28,12 +28,12 @@ Fondasi ini **bukan** organisasi engineering otonom yang telah tersertifikasi. O
 ## Lingkungan yang ditargetkan
 
 - Ubuntu/Linux
-- Git
-- Versi Python dan workflow package yang didukung repository
+- Git (termasuk Git LFS sesuai panduan kontribusi)
+- Python **3.14** (`>=3.14,<3.15`) melalui workflow PM yang didukung repository
 - Node.js hanya untuk workflow yang memerlukannya
 - Docker atau Nix hanya ketika menjalankan pemeriksaan terkait
 
-Periksa [pyproject.toml](pyproject.toml) dan [CONTRIBUTING.md](CONTRIBUTING.md) untuk ketentuan versi serta workflow yang berlaku.
+Ikuti [CONTRIBUTING.md — Development Setup](CONTRIBUTING.md#development-setup) untuk menyiapkan Python dan PM. Jangan mengasumsikan Python sistem yang terpasang sudah memenuhi versi yang diperlukan, dan jangan mengubah environment yang dikelola PM dengan `pip` atau `uv` secara langsung.
 
 ## Menyiapkan lingkungan pengujian pribadi
 
@@ -60,21 +60,41 @@ mkdir -p "$ZIVI_HOME"
 
 Gunakan API key pengujian terpisah jika memungkinkan. Jangan menyimpan kredensial, database sesi, memory, cache, atau log pribadi ke Git.
 
-### 3. Siapkan environment pengembangan
+### 3. Siapkan Python dan PM
 
-Ikuti workflow yang dipelihara di [CONTRIBUTING.md](CONTRIBUTING.md). Perintah berikut menyiapkan environment pengembangan dan pengujian:
+Selesaikan prasyarat dan workflow PM di [CONTRIBUTING.md — Development Setup](CONTRIBUTING.md#development-setup) terlebih dahulu. Repository ini memerlukan Python **3.14** (`>=3.14,<3.15`); gunakan interpreter yang disiapkan melalui workflow PM, bukan Python sistem dengan versi yang tidak sesuai.
+
+Setelah PM siap, dari root checkout, aktifkan environment development repository:
+
+```bash
+source ./activate
+```
+
+Jangan lanjutkan jika aktivasi gagal. Ikuti pesan error dari workflow PM untuk mendiagnosis masalah sebelum menjalankan test.
+
+### 4. Jalankan smoke test CLI
+
+Dengan environment repository aktif dan `ZIVI_HOME`/`HERMES_HOME` diarahkan ke direktori pengujian yang terisolasi, jalankan:
+
+```bash
+hermes --version
+```
+
+Perintah ini memverifikasi bahwa CLI dari checkout aktif dapat dipanggil dan melaporkan versinya. Ini **bukan** bukti bahwa provider, gateway, installer, updater, atau integrasi eksternal berfungsi. Selama migrasi, nama executable masih `hermes`; command `zivi` belum ditambahkan.
+
+Jika executable yang ditemukan bukan berasal dari checkout ini, periksa aktivasi environment dan `PATH`. Jangan menghapus atau menimpa instalasi lain hanya untuk mengubah prioritas command.
+
+### 5. Siapkan environment pengujian terpisah (opsional)
+
+Dari root checkout setelah workflow PM menyiapkan Python 3.14, buat environment independen untuk test dan editor:
 
 ```bash
 python -m pm.build_env --source . --out .venv --group dev --group test
 ```
 
+Direktori tujuan `.venv` harus belum ada, termasuk sebagai direktori kosong atau symlink. Jika ingin memakai lokasi lain, pilih path baru. Jangan menghapus environment yang sudah ada tanpa memastikan bahwa itu hanya environment disposable yang memang ingin dibuat ulang. Gunakan environment terpisah ini untuk test sesuai panduan kontribusi.
+
 Langkah ini tidak menjamin semua backend opsional atau integrasi eksternal terpasang. Siapkan dependensi tambahan hanya untuk fitur yang memang akan diuji.
-
-### 4. Jalankan CLI
-
-Selama migrasi, nama executable CLI lama masih dipertahankan agar komponen runtime yang belum dimigrasikan tetap dapat digunakan. Perubahan ke command `zivi` akan dilakukan dalam fase tersendiri setelah entry point, installer, updater, dan pengujian kompatibilitas siap.
-
-Jika executable yang ditemukan bukan berasal dari environment pengujian, periksa `PATH` dan lokasi command terlebih dahulu. Jangan menghapus atau menimpa instalasi lain hanya untuk mengubah prioritas command.
 
 ## Verifikasi perubahan
 
