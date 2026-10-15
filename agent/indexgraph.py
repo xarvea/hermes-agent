@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -177,7 +178,7 @@ def _relative_path(root: Path, value: str, *, allow_empty: bool = False) -> str:
     if "\\" in value or value.startswith("/"):
         raise ValueError("path must be a relative POSIX path")
     parsed = PurePosixPath(value)
-    if parsed.is_absolute() or any(part in {"", ".", ".."} for part in parsed.parts):
+    if parsed.as_posix() != value or parsed.is_absolute() or not parsed.parts or any(part in {"", ".", ".."} for part in parsed.parts):
         raise ValueError("path traversal or non-canonical path is not allowed")
     candidate = (root / Path(*parsed.parts)).resolve(strict=False)
     try:
@@ -190,6 +191,8 @@ def _relative_path(root: Path, value: str, *, allow_empty: bool = False) -> str:
 def validate_manifest(manifest: IndexManifest, root: Path) -> None:
     if manifest.canonical_root != str(root):
         raise ValueError("manifest canonical_root does not match the store root")
+    if not isinstance(manifest.status, IndexStatus):
+        raise ValueError("manifest status must be an IndexStatus value")
     for name, value in (
         ("project_id", manifest.project_id),
         ("provider_id", manifest.provider_id),
@@ -222,6 +225,8 @@ def validate_node(node: GraphNode, root: Path) -> None:
             raise ValueError(f"node {name} must be a non-empty string")
     if node.kind not in NODE_KINDS:
         raise ValueError(f"unsupported node kind: {node.kind}")
+    if not isinstance(node.confidence, Confidence):
+        raise ValueError("node confidence must be a Confidence value")
     if len(node.label) > MAX_LABEL_CHARS:
         raise ValueError("node label exceeds the configured limit")
     _relative_path(root, node.path, allow_empty=(node.kind == "project"))
@@ -246,6 +251,8 @@ def validate_edge(edge: GraphEdge, root: Path, node_ids: set[str]) -> None:
             raise ValueError(f"edge {name} must be a non-empty string")
     if edge.relation not in EDGE_RELATIONS:
         raise ValueError(f"unsupported edge relation: {edge.relation}")
+    if not isinstance(edge.confidence, Confidence):
+        raise ValueError("edge confidence must be a Confidence value")
     if edge.from_id not in node_ids or edge.to_id not in node_ids:
         raise ValueError("edge endpoints must reference nodes in the same snapshot")
     _relative_path(root, edge.source_path)
@@ -332,6 +339,21 @@ class IndexGraphStore:
         )
         return connection
 
+    @contextmanager
+    def _connection(self):
+        """Open a short-lived connection and always commit/rollback and close it."""
+        connection = self._connect()
+        try:
+            yield connection
+            if connection.in_transaction:
+                connection.commit()
+        except Exception:
+            if connection.in_transaction:
+                connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     def replace_snapshot(
         self,
         manifest: IndexManifest,
@@ -373,7 +395,7 @@ class IndexGraphStore:
              _bounded_json(edge.to_record(), max_bytes=MAX_PROVENANCE_BYTES * 4, field_name="edge"))
             for edge in edge_list
         ]
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute("DELETE FROM edges")
             connection.execute("DELETE FROM nodes")
