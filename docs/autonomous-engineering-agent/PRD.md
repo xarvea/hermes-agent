@@ -250,6 +250,94 @@ Benchmark single-agent and area-delegated execution on equivalent representative
 - Benchmarks report peak context, total tokens/cost, latency, model calls, quality, and recovery outcomes; no efficiency claim is made from peak context alone.
 - Thresholds and delegation policies are configurable and validated against the supported models/runtime rather than hard-coded as universal facts.
 
+### 6.7 Mandatory per-project IndexGraph and retrieval gate
+
+**Status: PROPOSED — accepted for planning; not yet implemented or benchmarked.** This is a future runtime capability, not functionality delivered by merged PR #1. Implement it through a separate, reviewable change after confirming the available parser, repository-watcher, task-backend, and runtime integration seams.
+
+#### Objective and mandatory policy
+
+Every project that Zivi is asked to inspect or modify must have a project-scoped code index available before ordinary code-changing work begins. On first use, Zivi must attempt automatic discovery and IndexGraph bootstrap. Before planning a non-trivial code change, it must retrieve and inspect relevant index evidence rather than choosing files solely from conversational assumptions.
+
+**Indexing is mandatory; trusting the index blindly is prohibited.** Source files, active configuration, and executed verification remain authoritative. IndexGraph is derived data that may be stale, incomplete, or wrong.
+
+If bootstrap or retrieval fails, Zivi must expose an explicit state such as `NOT_INDEXED`, `STALE`, or `DEGRADED`. High-impact structural or security-sensitive changes must be blocked until sufficient source-backed analysis is available. Lower-risk tasks may use a declared fallback—such as targeted file reads, symbol search, or supported parser output—only if the task policy permits it; the agent must record the limitation and must not claim a complete graph.
+
+#### Graph scope and provenance
+
+The initial graph schema should support the following node/edge families where the language tooling can substantiate them:
+
+- **Repository structure:** project root, directories, files, workspace/package boundaries, entry points, build/test configuration, and generated/vendor exclusions.
+- **Code structure:** modules, symbols such as functions/classes/interfaces, imports, references, and call relationships where reliably extractable.
+- **Dependency relationships:** internal module/package edges and declared external dependencies, with source locations and extraction method.
+- **Operational and security-relevant surfaces:** API routes, authentication/authorization middleware, database access, external service clients, secrets/configuration *references* (never secret values), and CI/CD workflows.
+- **Verification relationships:** tests and checks associated with modules or components when this mapping is supported by repository evidence.
+
+Every material node/edge must retain provenance sufficient to locate its source (for example, path plus line/symbol range when available), extraction method, and confidence/completeness state. The builder must not invent call edges or represent inferred relationships as confirmed facts. Unsupported language constructs must be marked unknown or partial.
+
+#### Project identity, isolation, and persistence
+
+- Scope every index to an explicit canonical project root and project/profile identity. Resolve and validate paths before reading or writing.
+- Keep project metadata separate from other projects; prevent cross-project retrieval, cache collisions, and state leakage.
+- Persist index schema version, builder/parser versions, source revision or fingerprint, last successful indexing time, indexed-file inventory, exclusions, and any failed/unsupported files.
+- Treat the graph as reproducible derived data. It must be safe to rebuild or discard without changing source code or task ownership.
+- Exclude credentials, secret values, sensitive environment contents, build outputs, caches, and vendor/dependency trees by default unless a specific safe indexing rule explicitly requires metadata from them. Never embed secret values in nodes, logs, or retrieval results.
+- Honor repository ignore rules and explicit project policy; report significant exclusions so missing graph coverage is visible.
+
+#### Bootstrap, freshness, and incremental synchronization
+
+1. On first project use, detect languages, frameworks, workspace boundaries, available parser/tooling, and repository configuration.
+2. Build the initial graph using supported deterministic parsers and metadata extraction. Use AI-assisted inference only as a clearly labeled, lower-confidence supplement—not as a substitute for source evidence.
+3. Record coverage, unsupported files, parser errors, source fingerprint/revision, and completion status.
+4. Before retrieval for a code-changing task, assess index freshness against current source state. A branch switch, changed dependency/configuration files, parser/schema upgrade, or structural change may require a broader refresh.
+5. After edits, update affected graph regions incrementally where safe. Trigger a full rebuild when dependency resolution, graph schema, parser version, or change coverage makes incremental results unreliable.
+6. Reconcile the index against the current working tree before final verification and do not report the index as fresh until synchronization succeeds.
+
+Freshness checks must be deterministic and bounded. Filesystem watchers may improve responsiveness but cannot be the sole correctness mechanism; check source fingerprints/repository state at task boundaries as well. Index update failure must not silently leave the status as current.
+
+#### Mandatory retrieval gate before code changes
+
+Before the first code mutation for a non-trivial task, the planner/controller must record a compact analysis that identifies:
+
+- the relevant indexed nodes and source references;
+- candidate files/modules and their dependency relationships;
+- likely downstream impact and relevant tests/checks;
+- index freshness/coverage and any parser gaps;
+- assumptions or uncertainties that need direct source inspection;
+- planned file ownership if multiple workers may edit the project.
+
+The controller must directly inspect the source for high-impact decisions and verify important graph-derived claims. The gate is a workflow/policy boundary and must be enforced by the orchestration/runtime path, not merely written into a system prompt. Pure explanation tasks, read-only exploration, and explicitly low-risk operations may use a lighter gate; the exception and rationale must be explicit.
+
+#### Integration with Context Survival and area delegation
+
+- Context Manager uses IndexGraph to retrieve task-relevant symbols, files, dependency neighborhoods, decisions, and test references instead of carrying the entire repository history into every model invocation.
+- Survival state stores the project/index identity, schema and source revision/fingerprint, index status, relevant node/file references, and known coverage gaps. After compaction or restart, the controller revalidates freshness before relying on stored references.
+- Area workers receive only the graph neighborhoods and source artifacts relevant to their bounded task, plus the task contract and security constraints.
+- Before parallel edits, the controller uses dependency/ownership evidence to identify likely overlap. Graph analysis is advisory for ownership; explicit task contracts and actual diff checks remain authoritative.
+- After integration, the controller updates the index, runs relevant verification, and checks whether changes invalidate other graph relationships.
+- IndexGraph is a retrieval/impact-analysis component, not a task scheduler, permission system, or substitute for independent review. Reuse the selected native Kanban/Swarm/dispatcher and exactly one authoritative task backend per run.
+
+#### Failure behavior and security
+
+- Never treat an absent, stale, partial, or failed index as complete.
+- Do not execute arbitrary repository build scripts or install dependencies merely to index a project without applying the existing execution/approval policy.
+- Treat repository content, comments, filenames, manifests, and generated metadata as untrusted input; none can alter permissions or policy.
+- Enforce root containment, symlink handling, file-size/resource limits, ignore/exclusion rules, and project/profile isolation.
+- Bound indexing time, memory, parser subprocesses, output size, and retry attempts. Support cancellation and visible failure reasons.
+- On suspected corruption or inconsistent incremental results, mark the index stale and rebuild or fall back to source-backed inspection; do not guess.
+- Keep the index read-only with respect to source code. Indexing must never rewrite project files.
+
+#### Acceptance criteria
+
+- First-use project discovery and bootstrap work on declared supported project types and produce a machine-readable index plus a human-readable coverage/status report.
+- The retrieval gate executes before non-trivial code mutation and records the relevant source evidence, impact analysis, freshness, and limitations.
+- Freshness tests cover changed files, branch switches, dependency/config changes, parser/schema upgrades, deleted/moved files, failed incremental updates, and interrupted indexing.
+- Security tests cover path traversal, symlink escapes, cross-project leakage, secret-value exclusion, hostile repository content, oversized files, and bounded parser execution.
+- When indexing is incomplete, the system either uses a policy-approved explicit fallback or blocks the task; it never silently claims a complete index.
+- Context Survival and area-worker handoffs carry stable index/source references and revalidate them after recovery.
+- Incremental updates are checked against full rebuilds on representative fixtures; discrepancies invalidate the incremental result rather than being ignored.
+- Benchmarks report initial build time, incremental update time, index size, coverage, retrieval latency/relevance, context tokens, total task tokens/cost, and task quality. Any performance or cost benefit remains a hypothesis until measured.
+- The index can be safely deleted and reconstructed from the project without losing authoritative task state or evidence.
+
 ## 7. Functional requirements
 
 | ID | Requirement | Acceptance evidence |
@@ -267,6 +355,10 @@ Benchmark single-agent and area-delegated execution on equivalent representative
 | FR-11 | Continue safe unblocked work without repeated user prompts. | End-to-end test demonstrating automatic progression and safe stop conditions. |
 | FR-12 | Keep fork CI validation secret-free and publishing protected. | Workflow-policy tests and observed CI behavior. |
 | FR-13 | Report actual verification outcomes honestly. | Passed/failed/blocked/skipped/not-verified matrix with evidence references. |
+| FR-17 | Automatically bootstrap a project-scoped IndexGraph before non-trivial code changes. | Supported-project fixtures produce an index, provenance, coverage, and explicit status. |
+| FR-18 | Require source-backed IndexGraph retrieval and impact analysis before non-trivial code mutation. | Runtime/orchestration tests prove the gate runs and records evidence before mutation. |
+| FR-19 | Keep the index fresh and isolated across source changes, branches, and projects. | Incremental-vs-full rebuild, freshness, and cross-project isolation tests pass. |
+| FR-20 | Handle indexing failures explicitly and safely. | Policy-approved fallback or blocked state; no silent stale/complete claim. |
 | FR-14 | Reconstruct task context safely after compaction, interruption, or restart. | Recovery tests reconcile durable state with actual workspace/artifacts; no inferred completion. |
 | FR-15 | Delegate bounded work to area specialists only under explicit contracts and ownership. | Contract validation, permission/budget checks, conflict handling, and controller-validated handoffs. |
 | FR-16 | Measure context efficiency without conflating peak context with total cost. | Comparable benchmark reports per-call peak context, total tokens/cost, latency, quality, and recovery. |
@@ -298,6 +390,9 @@ PR #1 only implements a subset of these requirements. The rest define the produc
 - **Delegation efficiency:** choose single-agent execution for simple tasks; use area workers only when measured quality/latency/cost trade-offs justify coordination overhead.
 - **Portability:** current fork target is Ubuntu/Linux. Platform-specific tests disabled by policy must be reported as skipped/not applicable, not as passed.
 - **Observability:** record task/meeting/role IDs, transitions, duration, budget use, failure class, and evidence references; redact sensitive payloads.
+- **Index integrity:** source files remain authoritative; graph entries retain provenance, freshness metadata, and coverage limitations.
+- **Index isolation:** project/profile scoping, path containment, secret exclusion, and bounded parsing are mandatory.
+- **Index performance:** support incremental updates and bounded retrieval; performance claims require measurements against full rebuilds and representative tasks.
 - **Recovery:** persisted state is a recovery hint; current working tree and real artifacts must be inspected before resuming.
 
 ## 10. Delivery phases and status after PR #1
@@ -309,6 +404,7 @@ Phase names and exit gates below follow the current accepted `TEAM_OS_PLAN.md`. 
 | **0 — Runtime audit and threat model** | Confirm AIAgent lifecycle, delegation, task authority, approval enforcement, project/profile boundaries, threat model, and test matrix; no guessed APIs. | **IN_PROGRESS / NOT VERIFIED.** Audit and action matrix exist, but open audit items remain, including full action-class enforcement mapping and focused runtime tests. |
 | **1 — Workflow foundation and durable state** | Stabilize prompt guidance, skill, task ledger/read-only resume; verify path containment, state invariants, dependencies, evidence, bounded context, and secret safety. | **PARTIALLY DELIVERED.** Foundation and 17 focused tests merged. Complete phase acceptance evidence and focused test execution remain to be recorded. |
 | **2 — Role registry and runtime integration** | Typed role contracts, capability/budget validation, explicit backend selection, Kanban/delegation integration, deterministic dispatch, and validated worker handoff contracts. | **NOT COMPLETE.** No claim of a complete role registry/backend adapter; Context Survival and area-worker contracts are proposed, not implemented. |
+| **2A — Project IndexGraph foundation** | Project discovery, index schema/provenance, bootstrap, freshness state, and retrieval-gate integration verified on declared Linux-supported fixtures. | **NOT STARTED.** Proposed requirement only; no implementation or benchmark evidence. |
 | **3 — CTO planner and research** | Structured requirements, source-backed research, alternatives, architecture, risks, and validated task graph. | **NOT COMPLETE.** Planning protocol is documented; automated planner behavior is not certified. |
 | **4 — Meeting and decision protocol** | Bounded proposals/critique, conflict handling, decision ownership, ADR persistence, revisit conditions. | **NOT COMPLETE.** Protocol is specified; runtime behavior is not certified. |
 | **5 — Execution orchestration** | Role-aware Kanban Swarm/dispatcher execution, isolation, checkpointing, safe auto-advance and resume. | **NOT COMPLETE.** Full end-to-end orchestration is still roadmap work. |
@@ -350,6 +446,8 @@ These are historical results recorded in the PR description, not a fresh CI quer
 | Secret or project data leaks across context | Security/privacy incident | Sanitized evidence, explicit root/profile scoping, isolation tests. |
 | Implementer self-certifies work | Defects pass unnoticed | Independent QA/security/reviewer gate. |
 | CI platform coverage is reduced | Regressions on unsupported platforms may go undetected | State Linux-only support explicitly; never count disabled jobs as passing. |
+| Index becomes stale or produces incorrect relationships | Planner misses impacted files or makes unsupported assumptions | Source provenance, freshness gates, incremental-vs-full rebuild tests, explicit partial status, and direct source verification. |
+| Indexing reads sensitive or hostile repository content unsafely | Secret exposure, resource exhaustion, or unintended command execution | Secret-value exclusion, untrusted-content handling, bounded parsers, path containment, and no implicit build-script execution. |
 | CI success is interpreted as production certification | Unsafe deployment or misleading claims | Phase exit gates and evidence-based readiness matrix. |
 | Branding/runtime migration is mixed with engineering logic | Broad regressions and hard-to-review changes | Keep identity migration in separate, staged PRs with compatibility tests. |
 
@@ -376,6 +474,8 @@ These are historical results recorded in the PR description, not a fresh CI quer
 8. Require human approval for high-impact, destructive, financial, signing, and production actions.
 9. Plan a Context Survival Protocol plus task-specific context assembly to preserve mission continuity while minimizing irrelevant context.
 10. Plan area-based subagent delegation under explicit task, ownership, permission, evidence, and resource contracts; use delegation selectively and validate efficiency with benchmarks.
+11. Require project-scoped IndexGraph bootstrap and source-backed retrieval before non-trivial code mutation, with explicit freshness, provenance, and failure states.
+12. Treat IndexGraph as derived evidence for retrieval and impact analysis—not as source of truth, scheduler, or permission boundary.
 
 ### Open items that block phase closure
 
@@ -383,6 +483,10 @@ These are historical results recorded in the PR description, not a fresh CI quer
 - Validate compaction/recovery thresholds and context assembly behavior with repeatable measurements.
 - Implement bounded area-worker contracts, file ownership, handoff validation, and controller integration without duplicating Kanban/Swarm.
 - Benchmark single-agent versus area delegation for peak context, total token/cost, latency, quality, and recovery before claiming efficiency gains.
+- Define the initial supported language/parser matrix and deterministic IndexGraph schema.
+- Implement project discovery, bootstrap, freshness detection, incremental sync, and the mandatory retrieval gate.
+- Verify project isolation, secret exclusion, path containment, parser resource limits, and hostile repository handling.
+- Benchmark incremental indexing against full rebuilds and measure retrieval quality/context/cost impact on representative Ubuntu/Linux projects.
 - Complete the action-class inventory against enabled tools and actual handler call paths.
 - Verify approval transport and subagent policy in CLI, gateway, and unattended execution contexts.
 - Verify Kanban lifecycle/backend adapter contracts with focused tests.
