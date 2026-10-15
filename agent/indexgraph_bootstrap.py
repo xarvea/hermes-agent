@@ -246,6 +246,11 @@ def _resolve_python_module(root: Path, module_path: str) -> str | None:
     return None
 
 
+def _python_requirement_name(requirement: str) -> str:
+    """Extract the normalized project-name token from a PEP 508 requirement."""
+    match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
+    return match.group(1) if match else ''
+
 def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
     name = PurePosixPath(path).name.lower()
     try:
@@ -266,14 +271,19 @@ def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
             record = tomllib.loads(data.decode("utf-8"))
             project = record.get("project", {})
             deps = project.get("dependencies", []) if isinstance(project, dict) else []
-            result = [(item.split(";", 1)[0].split("[", 1)[0].split("<", 1)[0].split(">", 1)[0].split("=", 1)[0].split("!", 1)[0].split("~", 1)[0].strip(), item) for item in deps if isinstance(item, str]
+            result = [
+                (_python_requirement_name(item), item)
+                for item in deps
+                if isinstance(item, str)
+            ]
             optional = project.get("optional-dependencies", {}) if isinstance(project, dict) else {}
             if isinstance(optional, dict):
                 for values in optional.values():
                     if isinstance(values, list):
                         result.extend(
-                            (item.split(";", 1)[0].split("[", 1)[0].split("<", 1)[0].split(">", 1)[0].split("=", 1)[0].split("!", 1)[0].split("~", 1)[0].strip(), item)
-                            for item in values if isinstance(item, str)
+                            (_python_requirement_name(item), item)
+                            for item in values
+                            if isinstance(item, str)
                         )
             return sorted((package, spec) for package, spec in result if package)
         if name == "cargo.toml":
