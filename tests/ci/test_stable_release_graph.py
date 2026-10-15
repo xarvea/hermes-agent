@@ -162,8 +162,13 @@ def test_a_skipped_upgrade_arm_never_skips_a_gated_publish_job():
 
 def test_all_applicable_ci_jobs_are_aggregated_and_desktop_e2e_stays_deferred():
     jobs = workflow("ci.yaml")["jobs"]
-    checks = {name for name, job in jobs.items() if "uses" in job}
+    checks = {
+        name for name, job in jobs.items()
+        if "uses" in job and job.get("if") is not False
+    }
     assert checks <= set(jobs["all-checks-pass"]["needs"])
+    assert jobs["tests-os"].get("if") is False
+    assert "tests-os" not in jobs["all-checks-pass"]["needs"]
     assert not gate(jobs["e2e-desktop"]["if"], {}, {})
     assert "workflow_call" in workflow("ci.yaml")["on"]
 
