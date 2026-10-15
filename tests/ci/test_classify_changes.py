@@ -575,9 +575,7 @@ def _iter_if_expressions(job: object):
 # suite: each runs on a PR exactly when its lane fires and then gates the merge.
 _REAL_UPDATE_LANES = (
     ("ci.yaml", "tests", "tests.yml", "e2e_upgrade"),
-    ("ci.yaml", "tests-os", "tests-os.yml", "e2e_upgrade"),
     ("ci.yaml", "e2e-desktop-update", "e2e-desktop-update.yml", "e2e_desktop_update"),
-    ("tests-os.yml", "install-update-e2e", "windows-install-update-e2e.yml", "e2e_upgrade"),
     # Not an update suite, but the same contract: the real SSH/Docker backend lane.
     ("ci.yaml", "remote-backends", "remote-backends.yml", "remote_backends"),
 )
@@ -600,6 +598,14 @@ def test_real_update_suites_gate_the_merge_when_their_lane_fires(caller, job, ca
     assert root in ci["jobs"]["all-checks-pass"]["needs"]
     for name, body in _yaml(f".github/workflows/{called}")["jobs"].items():
         assert not body.get("continue-on-error"), f"{called}::{name} cannot fail the merge"
+
+
+def test_linux_only_ci_excludes_os_specific_workflow_from_required_checks():
+    ci = _yaml(".github/workflows/ci.yaml")
+    os_job = ci["jobs"]["tests-os"]
+    assert os_job.get("if") is False
+    assert "Linux-only target" in str(os_job.get("name", ""))
+    assert "tests-os" not in ci["jobs"]["all-checks-pass"]["needs"]
 
 
 def test_remote_backends_lane_runs_test_files_that_exist_and_start_it():
