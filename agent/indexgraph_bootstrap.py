@@ -116,7 +116,8 @@ def _git_paths(root: Path) -> list[str] | None:
                 "git", "-C", str(root), "ls-files", "--cached", "--others",
                 "--exclude-standard", "-z",
             ],
-            check=False, capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
+            check=False, capture_output=True, stdin=subprocess.DEVNULL,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -147,7 +148,8 @@ def _source_revision(root: Path) -> str | None:
     try:
         result = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
-            check=False, capture_output=True, text=True, timeout=GIT_TIMEOUT_SECONDS,
+            check=False, capture_output=True, text=True,
+            stdin=subprocess.DEVNULL, timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
