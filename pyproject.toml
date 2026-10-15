@@ -5,7 +5,7 @@
 [project]
 name = "hermes-agent"
 version = "0.0.0"
-description = "Zivi personal Linux testing fork of Hermes Agent; keeps the hermes CLI for runtime compatibility"
+description = "Zivi personal Ubuntu/Linux AI agent development and learning fork"
 readme = "README.md"
 # 3.14 is the newest python we know we have wheels for.
 # we *only* support 3.14, BUT we need to allow old hermes installs on <3.14
