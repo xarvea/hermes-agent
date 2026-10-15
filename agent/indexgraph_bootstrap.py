@@ -464,6 +464,7 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
             "max_files": policy.max_files, "max_file_bytes": policy.max_file_bytes,
             "max_total_bytes": policy.max_total_bytes,
             "excluded_dirs": sorted(policy.excluded_dirs),
+            "text_suffixes": sorted(policy.text_suffixes),
         }, sort_keys=True).encode()),
         last_success_at=utc_now(),
         errors=tuple(errors),
