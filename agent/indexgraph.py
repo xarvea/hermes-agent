@@ -409,6 +409,112 @@ class IndexGraphStore:
             )
             connection.execute("INSERT INTO manifest (singleton, payload) VALUES (1, ?)", (manifest_json,))
 
+    def apply_snapshot_delta(
+        self,
+        manifest: IndexManifest,
+        nodes: Iterable[GraphNode],
+        edges: Iterable[GraphEdge],
+    ) -> dict[str, int]:
+        """Atomically reconcile a desired snapshot without rewriting unchanged rows.
+
+        The caller may compute a complete desired graph, but this persistence path only
+        inserts, updates, or deletes rows whose serialized payload or identity changed.
+        """
+        if not isinstance(manifest, IndexManifest):
+            raise TypeError("manifest must be an IndexManifest")
+        validate_manifest(manifest, self.root)
+        node_list = list(nodes)
+        edge_list = list(edges)
+        node_ids: set[str] = set()
+        for node in node_list:
+            validate_node(node, self.root)
+            if node.id in node_ids:
+                raise ValueError(f"duplicate node id: {node.id}")
+            node_ids.add(node.id)
+        edge_ids: set[str] = set()
+        for edge in edge_list:
+            validate_edge(edge, self.root, node_ids)
+            if edge.id in edge_ids:
+                raise ValueError(f"duplicate edge id: {edge.id}")
+            edge_ids.add(edge.id)
+
+        manifest_json = _bounded_json(
+            manifest.to_record(), max_bytes=MAX_JSON_FIELD_BYTES * 2, field_name="manifest",
+        )
+        node_payloads = {
+            node.id: (
+                node.kind, node.path,
+                _bounded_json(node.to_record(), max_bytes=MAX_JSON_FIELD_BYTES * 2, field_name="node"),
+            )
+            for node in node_list
+        }
+        edge_payloads = {
+            edge.id: (
+                edge.from_id, edge.to_id, edge.relation,
+                _bounded_json(edge.to_record(), max_bytes=MAX_PROVENANCE_BYTES * 4, field_name="edge"),
+            )
+            for edge in edge_list
+        }
+
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_nodes = {
+                row["id"]: row["payload"]
+                for row in connection.execute("SELECT id, payload FROM nodes")
+            }
+            existing_edges = {
+                row["id"]: row["payload"]
+                for row in connection.execute("SELECT id, payload FROM edges")
+            }
+            stale_edges = sorted(existing_edges.keys() - edge_payloads.keys())
+            stale_nodes = sorted(existing_nodes.keys() - node_payloads.keys())
+            changed_nodes = sum(
+                1 for node_id, (_, _, payload) in node_payloads.items()
+                if existing_nodes.get(node_id) != payload
+            )
+            changed_edges = sum(
+                1 for edge_id, (_, _, _, payload) in edge_payloads.items()
+                if existing_edges.get(edge_id) != payload
+            )
+
+            connection.executemany("DELETE FROM edges WHERE id = ?", ((item,) for item in stale_edges))
+            connection.executemany("DELETE FROM nodes WHERE id = ?", ((item,) for item in stale_nodes))
+            connection.executemany(
+                """
+                INSERT INTO nodes (id, kind, path, payload) VALUES (?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    kind = excluded.kind, path = excluded.path, payload = excluded.payload
+                WHERE nodes.payload != excluded.payload
+                """,
+                ((node_id, kind, path, payload)
+                 for node_id, (kind, path, payload) in sorted(node_payloads.items())),
+            )
+            connection.executemany(
+                """
+                INSERT INTO edges (id, from_id, to_id, relation, payload) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    from_id = excluded.from_id, to_id = excluded.to_id,
+                    relation = excluded.relation, payload = excluded.payload
+                WHERE edges.payload != excluded.payload
+                """,
+                ((edge_id, from_id, to_id, relation, payload)
+                 for edge_id, (from_id, to_id, relation, payload) in sorted(edge_payloads.items())),
+            )
+            connection.execute(
+                """
+                INSERT INTO manifest (singleton, payload) VALUES (1, ?)
+                ON CONFLICT(singleton) DO UPDATE SET payload = excluded.payload
+                WHERE manifest.payload != excluded.payload
+                """,
+                (manifest_json,),
+            )
+        return {
+            "inserted_or_updated_nodes": changed_nodes,
+            "deleted_nodes": len(stale_nodes),
+            "inserted_or_updated_edges": changed_edges,
+            "deleted_edges": len(stale_edges),
+        }
+
     def load_snapshot(self) -> tuple[IndexManifest | None, list[GraphNode], list[GraphEdge]]:
         """Load the current validated-schema snapshot; returns an empty result before first build."""
         with self._connection() as connection:
