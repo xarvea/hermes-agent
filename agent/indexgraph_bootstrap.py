@@ -215,9 +215,16 @@ def _python_imports(data: bytes, source: str) -> list[tuple[str, int]]:
         if isinstance(node, ast.ImportFrom):
             if node.level:
                 base_parts = parent.parts[:max(0, len(parent.parts) - node.level + 1)]
-                module = ".".join((*base_parts, *(node.module or "").split("."))).strip(".")
-                if module:
-                    imports.append((module.replace(".", "/"), node.lineno))
+                base = "/".join(base_parts)
+                if node.module:
+                    module = "/".join(part for part in (base, node.module.replace(".", "/")) if part)
+                    if module:
+                        imports.append((module, node.lineno))
+                else:
+                    imports.extend(
+                        ("/".join(part for part in (base, alias.name) if part), node.lineno)
+                        for alias in node.names
+                    )
             elif node.module:
                 imports.append((node.module.replace(".", "/"), node.lineno))
         elif isinstance(node, ast.Import):
