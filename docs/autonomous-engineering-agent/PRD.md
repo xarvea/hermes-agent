@@ -252,6 +252,8 @@ Benchmark single-agent and area-delegated execution on equivalent representative
 
 ### 6.7 Mandatory per-project IndexGraph and retrieval gate
 
+The proposed technical contract and staged bootstrap design are specified in [INDEXGRAPH_DESIGN.md](./INDEXGRAPH_DESIGN.md). The design remains proposed until runtime integration and acceptance tests prove the enforcement gate.
+
 **Status: PROPOSED — accepted for planning; not yet implemented or benchmarked.** This is a future runtime capability, not functionality delivered by merged PR #1. Implement it through a separate, reviewable change after confirming the available parser, repository-watcher, task-backend, and runtime integration seams.
 
 #### Objective and mandatory policy
@@ -523,6 +525,7 @@ Primary sources:
 - [ADR-0001](./decisions/ADR-0001-native-kanban-task-backend.md) — accepted task-backend decision and consequences.
 - [ADR-0002](./decisions/ADR-0002-role-dispatch-and-kanban-ownership.md) — role dispatch and Kanban ownership boundary.
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — architecture overview.
+- [INDEXGRAPH_DESIGN.md](./INDEXGRAPH_DESIGN.md) — proposed IndexGraph schema, bootstrap, freshness, retrieval gate, provider contract, and verification plan.
 - [PR #1 changed-file list](https://github.com/xarvea/zivi/pull/1/files) — implementation and CI change surface.
 
 **Research method:** repository planning and runtime-audit documents were inspected against the current `main`; PR #1 metadata, merge commit, changed-file list, and recorded CI evidence were checked. Runtime-specific claims are grounded in these repository sources. No external benchmark or unverified production claim is used. The phase status above is deliberately conservative and must be updated only when new test/CI/runtime evidence satisfies the relevant exit gate.
