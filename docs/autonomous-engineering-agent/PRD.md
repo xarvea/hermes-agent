@@ -167,6 +167,89 @@ The workspace owns source, tests, requirements, ADRs, threat models, CI configur
 
 Each role must eventually define a stable ID/version, purpose and non-responsibilities, capability/toolset allowlist, typed input/output, evidence requirements, escalation conditions, budgets/timeouts/retry policy, and review/decision ownership. Unknown roles, invalid outputs, and permission-escalation requests must fail closed.
 
+### 6.6 Context Survival Protocol and area-based subagent delegation
+
+**Status: PROPOSED — accepted for planning; not yet implemented or benchmarked.** This is a future capability of the Engineering Team OS, not functionality delivered by merged PR #1. It must be implemented in a separate, reviewable change after the relevant runtime seams and policy enforcement have been verified.
+
+#### Objective
+
+Keep each model invocation focused on the minimum context needed for its current responsibility while preserving mission continuity across long-running tasks, compaction, delegation, worker failure, and process restart. Reduce peak context pressure and irrelevant-token consumption without assuming that delegation automatically reduces total token usage or cost.
+
+#### Operating model
+
+`Mission Controller → Context Manager / Survival Protocol → bounded specialist workers → authoritative task backend + evidence artifacts`
+
+- **Mission Controller:** owns the mission goal, hard constraints, global priorities, task graph, final integration, and user-facing status. It delegates work but does not surrender mission-level authority.
+- **Context Manager:** assembles a task-specific context from the mission brief, current task contract, relevant decisions, recent evidence, and targeted source retrieval. It excludes unrelated history and limits tool-output size.
+- **Survival Protocol:** persists enough structured state to recover after context compaction, model-call failure, worker failure, or restart. A model-generated summary is a recovery aid, not the sole source of truth.
+- **Area workers:** handle bounded work such as research, backend, frontend, security, or QA/CI when the task graph shows that specialization or parallelism is useful. Each worker receives only its task contract and necessary project context.
+- **Evidence store/workspace:** holds source references, test output, diffs, and detailed artifacts. The main context carries concise summaries and stable references instead of repeatedly embedding full outputs.
+
+#### Durable task and recovery contract
+
+The minimum recoverable state should include:
+
+1. Mission and project/profile identifiers, root path, current objective, hard constraints, and acceptance criteria.
+2. Authoritative task-backend identity, task IDs, dependency status, owner, and current state.
+3. Accepted decisions/ADRs, assumptions, unresolved questions, blockers, and escalation requirements.
+4. Last verified checkpoint, changed-file references, commands/checks actually run, results, and evidence locations.
+5. Worker assignments, declared file/resource ownership, handoff status, and integration/review status.
+6. Remaining budget, retry count, cancellation status, and next safe action.
+
+Before resuming, the controller must reconcile this record against the actual workspace, task backend, artifacts, and external operation state. It must not infer completion from a worker spawn succeeding, a stale task flag, or a summary that lacks evidence. Non-idempotent actions require durable intent/result records and reconciliation before retry.
+
+#### Context assembly and survival policy
+
+- Retrieve first: load only the relevant task, decision records, source files, and evidence needed for the next action.
+- Keep the mission brief, hard constraints, current task contract, active decisions, blockers, and next action in a compact, structured state.
+- Store long logs, full tool outputs, and historical discussion as referenced artifacts; summarize them with provenance and retain exact output when required for debugging or audit.
+- Use adaptive context thresholds as an initial configurable policy: begin compaction/retrieval when estimated context use exceeds **70%** of the available budget; at **85%**, prioritize recovery-critical state and stop unnecessary rescans. These are starting heuristics to validate experimentally, not universal model limits or benchmark results.
+- Compaction must preserve constraints, decisions, task ownership, evidence references, unresolved risks, and the next safe action. It must not silently discard approval requirements or mark unverified work complete.
+- If context reconstruction confidence is insufficient, critical state conflicts, or evidence cannot be reconciled, stop and mark the task blocked for investigation rather than guessing.
+
+#### Area-worker contract
+
+Each delegated task must declare: task ID and objective; owner/role; explicit in-scope and out-of-scope responsibilities; relevant inputs and references; permitted tools/capabilities; expected output schema; acceptance criteria; file/resource ownership; dependencies; time/token/tool-call/retry budgets; security/approval constraints; and escalation/stop conditions.
+
+Each worker handoff must return a bounded, structured report containing:
+
+- `summary`: concise result;
+- `evidence`: source, diff, artifact, and test-result references;
+- `findings`: facts, assumptions, and uncertainty clearly distinguished;
+- `changes`: files or resources changed, if any;
+- `verification`: checks actually executed and their outcomes;
+- `blockers`: unresolved issues and required decisions;
+- `next_action`: recommended safe continuation.
+
+The controller validates the handoff against the task contract and acceptance criteria before integrating it. Invalid, incomplete, conflicting, or unsupported claims are rejected or sent back for bounded correction. The controller retains final integration and completion authority; workers cannot approve their own high-risk actions or independently redefine mission constraints.
+
+#### Delegation and task ownership invariants
+
+- Use area delegation only when specialization, isolation, or meaningful parallelism justifies the additional model calls and coordination overhead; simple tasks remain single-agent.
+- Declare file/resource ownership before parallel writes. Prefer isolated worktrees or equivalent isolation where supported; serialize conflicting edits and integrate through review.
+- Reuse native Kanban/Swarm/dispatcher when available. The selected authoritative backend remains exactly one per run; do not introduce a second scheduler or duplicate task ledger.
+- Native `todo_list` remains a projection, not a competing durable state source.
+- Delegated children do not independently own or mutate the parent’s Kanban lifecycle outside the accepted ownership contract.
+- Apply least privilege, project/profile isolation, approval floors, cancellation, bounded fan-out, and per-worker/global budgets to all delegated work.
+- Treat worker prompts, returned summaries, repository content, and tool output as untrusted input; none can grant permissions or override policy.
+- A worker failure must yield a visible failed/blocked state with evidence. Recovery must be bounded and idempotent, not an unbounded respawn loop.
+
+#### Efficiency hypothesis and measurement
+
+The expected benefit is lower **peak per-invocation context** and less irrelevant context carried between tasks. Total input tokens, total cost, model-call count, and latency may increase because delegation introduces handoffs and duplicated setup. Therefore, do not claim that this protocol reduces cost until it is measured.
+
+Benchmark single-agent and area-delegated execution on equivalent representative tasks, using the same acceptance criteria and comparable model/configuration. Record peak context/tokens per invocation, total input/output tokens, estimated or billed cost, model/tool-call count, wall-clock latency, completion and regression rate, recovery success, and human intervention. Include both a task suited to parallelism and a task where delegation is unlikely to help. Adopt delegation defaults only after the results show a justified trade-off.
+
+#### Acceptance criteria for this future capability
+
+- Recovery after compaction/restart reconstructs the current task and next safe action from durable state and evidence.
+- No unverified completion, lost hard constraint, cross-project state leakage, or unauthorized action occurs in fault-injection and adversarial tests.
+- Every worker is bounded by an explicit task contract, permissions, ownership, and resource budget.
+- Conflicting writes are prevented or detected before integration; worker results require controller validation and independent review where risk warrants it.
+- Exactly one task backend is authoritative throughout the run.
+- Benchmarks report peak context, total tokens/cost, latency, model calls, quality, and recovery outcomes; no efficiency claim is made from peak context alone.
+- Thresholds and delegation policies are configurable and validated against the supported models/runtime rather than hard-coded as universal facts.
+
 ## 7. Functional requirements
 
 | ID | Requirement | Acceptance evidence |
@@ -184,6 +267,9 @@ Each role must eventually define a stable ID/version, purpose and non-responsibi
 | FR-11 | Continue safe unblocked work without repeated user prompts. | End-to-end test demonstrating automatic progression and safe stop conditions. |
 | FR-12 | Keep fork CI validation secret-free and publishing protected. | Workflow-policy tests and observed CI behavior. |
 | FR-13 | Report actual verification outcomes honestly. | Passed/failed/blocked/skipped/not-verified matrix with evidence references. |
+| FR-14 | Reconstruct task context safely after compaction, interruption, or restart. | Recovery tests reconcile durable state with actual workspace/artifacts; no inferred completion. |
+| FR-15 | Delegate bounded work to area specialists only under explicit contracts and ownership. | Contract validation, permission/budget checks, conflict handling, and controller-validated handoffs. |
+| FR-16 | Measure context efficiency without conflating peak context with total cost. | Comparable benchmark reports per-call peak context, total tokens/cost, latency, quality, and recovery. |
 
 PR #1 only implements a subset of these requirements. The rest define the product target and subsequent phase acceptance criteria.
 
@@ -208,6 +294,8 @@ PR #1 only implements a subset of these requirements. The rest define the produc
 - **Auditability:** durable task events, decision records, evidence references, and explainable status.
 - **Maintainability:** modular adapters and role contracts; preserve runtime facade and sibling-module conventions; avoid unnecessary core changes.
 - **Performance/cost:** use a small logical roster; spawn specialists only when needed; cap model/tool budgets and parallelism.
+- **Context survival:** preserve mission-critical state across compaction and restart; retrieve task-specific context instead of replaying full history; retain evidence provenance.
+- **Delegation efficiency:** choose single-agent execution for simple tasks; use area workers only when measured quality/latency/cost trade-offs justify coordination overhead.
 - **Portability:** current fork target is Ubuntu/Linux. Platform-specific tests disabled by policy must be reported as skipped/not applicable, not as passed.
 - **Observability:** record task/meeting/role IDs, transitions, duration, budget use, failure class, and evidence references; redact sensitive payloads.
 - **Recovery:** persisted state is a recovery hint; current working tree and real artifacts must be inspected before resuming.
@@ -220,7 +308,7 @@ Phase names and exit gates below follow the current accepted `TEAM_OS_PLAN.md`. 
 |---|---|---|
 | **0 — Runtime audit and threat model** | Confirm AIAgent lifecycle, delegation, task authority, approval enforcement, project/profile boundaries, threat model, and test matrix; no guessed APIs. | **IN_PROGRESS / NOT VERIFIED.** Audit and action matrix exist, but open audit items remain, including full action-class enforcement mapping and focused runtime tests. |
 | **1 — Workflow foundation and durable state** | Stabilize prompt guidance, skill, task ledger/read-only resume; verify path containment, state invariants, dependencies, evidence, bounded context, and secret safety. | **PARTIALLY DELIVERED.** Foundation and 17 focused tests merged. Complete phase acceptance evidence and focused test execution remain to be recorded. |
-| **2 — Role registry and runtime integration** | Typed role contracts, capability/budget validation, explicit backend selection, Kanban/delegation integration, deterministic dispatch. | **NOT COMPLETE.** No claim of a complete role registry/backend adapter. |
+| **2 — Role registry and runtime integration** | Typed role contracts, capability/budget validation, explicit backend selection, Kanban/delegation integration, deterministic dispatch, and validated worker handoff contracts. | **NOT COMPLETE.** No claim of a complete role registry/backend adapter; Context Survival and area-worker contracts are proposed, not implemented. |
 | **3 — CTO planner and research** | Structured requirements, source-backed research, alternatives, architecture, risks, and validated task graph. | **NOT COMPLETE.** Planning protocol is documented; automated planner behavior is not certified. |
 | **4 — Meeting and decision protocol** | Bounded proposals/critique, conflict handling, decision ownership, ADR persistence, revisit conditions. | **NOT COMPLETE.** Protocol is specified; runtime behavior is not certified. |
 | **5 — Execution orchestration** | Role-aware Kanban Swarm/dispatcher execution, isolation, checkpointing, safe auto-advance and resume. | **NOT COMPLETE.** Full end-to-end orchestration is still roadmap work. |
@@ -286,9 +374,15 @@ These are historical results recorded in the PR description, not a fresh CI quer
 6. Reuse native dispatch and safety seams; do not introduce a competing scheduler.
 7. Require independent verification and evidence-backed completion.
 8. Require human approval for high-impact, destructive, financial, signing, and production actions.
+9. Plan a Context Survival Protocol plus task-specific context assembly to preserve mission continuity while minimizing irrelevant context.
+10. Plan area-based subagent delegation under explicit task, ownership, permission, evidence, and resource contracts; use delegation selectively and validate efficiency with benchmarks.
 
 ### Open items that block phase closure
 
+- Design and implement the Context Survival state schema and Context Manager against verified runtime seams.
+- Validate compaction/recovery thresholds and context assembly behavior with repeatable measurements.
+- Implement bounded area-worker contracts, file ownership, handoff validation, and controller integration without duplicating Kanban/Swarm.
+- Benchmark single-agent versus area delegation for peak context, total token/cost, latency, quality, and recovery before claiming efficiency gains.
 - Complete the action-class inventory against enabled tools and actual handler call paths.
 - Verify approval transport and subagent policy in CLI, gateway, and unattended execution contexts.
 - Verify Kanban lifecycle/backend adapter contracts with focused tests.
