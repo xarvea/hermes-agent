@@ -416,7 +416,12 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
             target_node = path_nodes.get(target_path)
             if target_node:
                 edge = _edge(project_id, source_node, "imports", target_node, path, fingerprints[path])
-                edges.append(GraphEdge(**{**edge.__dict__, "start_line": line, "end_line": line}))
+                edges.append(GraphEdge(**{
+                    **edge.__dict__,
+                    "id": stable_id(project_id, source_node.id, "imports", target_node.id, str(line)),
+                    "start_line": line,
+                    "end_line": line,
+                }))
 
         if PurePosixPath(path).name.lower() in {"pyproject.toml", "package.json", "cargo.toml", "go.mod"}:
             for package, specifier in _dependency_declarations(path, data):
