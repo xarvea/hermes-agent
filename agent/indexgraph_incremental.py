@@ -8,16 +8,16 @@ deleted targets cannot remain stale.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from agent.indexgraph import (
     GraphEdge, GraphNode, IndexGraphStore, IndexManifest, IndexStatus,
     utc_now,
 )
 from agent.indexgraph_bootstrap import (
-    BootstrapPolicy, BootstrapReport, MANIFEST_NAMES, SOURCE_SUFFIXES,
+    BootstrapPolicy, BootstrapReport,
     _add_relationships, _build_structure, _collect_files, _fingerprint,
-    _source_revision, build_index,
+    _source_revision,
 )
 import json
 
