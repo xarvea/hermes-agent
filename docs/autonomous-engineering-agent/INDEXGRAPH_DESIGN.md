@@ -247,7 +247,37 @@ Record baseline build duration, incremental duration, graph size, indexed covera
 
 Each stage is a separate reviewable checkpoint. Do not label IndexGraph “mandatory and enforced” until IG-4 has runtime evidence. Documentation alone is not enforcement.
 
-## 12. Open decisions before runtime implementation
+## 12. IG-0 runtime seam audit — observed findings
+
+**Audit status:** partial, source inspection only; no runtime tests executed. Findings below are grounded in the current main source/docs inspected on 2026-10-15. They narrow the design but do not prove an enforcement gate works end to end.
+
+### Confirmed integration facts
+
+1. **Project root is the session's effective working directory, not the installation root.** The repository's Git Worktrees guide says CLI sessions use the directory from which Hermes is launched, while gateway sessions use configured terminal.cwd. agent/runtime_cwd.py::resolve_agent_cwd() resolves the session/configured cwd with process cwd fallback. The file-path resolver uses task/session terminal cwd and registered overrides to avoid cross-session/worktree mistakes. IndexGraph must consume this runtime workspace resolver (or the exact per-task equivalent) and must not use hermes_cli.config.get_project_root(), which returns the installed runtime directory.
+   - Evidence: [Git Worktrees guide](https://github.com/xarvea/zivi/blob/main/website/docs/user-guide/git-worktrees.md), [runtime_cwd.py](https://github.com/xarvea/zivi/blob/main/agent/runtime_cwd.py), [file_tools_paths.py](https://github.com/xarvea/zivi/blob/main/tools/file_tools_paths.py), [hermes_cli/config.py](https://github.com/xarvea/zivi/blob/main/hermes_cli/config.py).
+
+2. **The proposed local state path has an existing ignore rule.** The current .gitignore includes .engineering-agent/. This supports keeping derived IndexGraph artifacts under that directory without introducing a new ignore rule, subject to an integration test proving the rule applies from the selected workspace root.
+   - Evidence: [.gitignore](https://github.com/xarvea/zivi/blob/main/.gitignore).
+
+3. **There are explicit file-mutation dispatch seams.** agent/tool_result_classification.py currently classifies write_file and patch as the named file-mutating tools. model_tools.py has pre-dispatch guard logic, and the runtime has tool hooks and a central registry/dispatch path. These are candidate integration points for an IndexGate check, but their suitability for all supported surfaces has not yet been proven.
+   - Evidence: [tool_result_classification.py](https://github.com/xarvea/zivi/blob/main/agent/tool_result_classification.py), [model_tools.py](https://github.com/xarvea/zivi/blob/main/model_tools.py), [tools/AGENTS.md](https://github.com/xarvea/zivi/blob/main/tools/AGENTS.md).
+
+4. **Terminal is a broader mutation channel.** The terminal tool supports multiple execution backends and command guards. Existing command-pattern checks are heuristic and cannot establish that every shell command is read-only. The runtime also exposes code execution, whose scripts can invoke file and terminal tools in supported contexts. Therefore, gating only write_file and patch would not establish the requested no-code-mutation-before-IndexGraph invariant.
+   - Evidence: [terminal_tool.py](https://github.com/xarvea/zivi/blob/main/tools/terminal_tool.py), [tool_dispatch_helpers.py](https://github.com/xarvea/zivi/blob/main/agent/tool_dispatch_helpers.py), [code execution documentation](https://github.com/xarvea/zivi/blob/main/website/docs/user-guide/features/code-execution.md).
+
+5. **GitNexus is an existing optional exploration workflow, not a safe default bootstrap yet.** Its documented npx gitnexus analyze command can create repository-side integration artifacts (including .claude/ unless options/cleanup are used) and assumes Node.js/Git. It must not be run automatically until an adapter can disable unwanted side effects, bound execution, and verify the output contract. The optional skill's web UI/tunnel is not part of routine IndexGraph bootstrap.
+   - Evidence: [GitNexus Explorer skill](https://github.com/xarvea/zivi/blob/main/optional-skills/research/gitnexus-explorer/SKILL.md).
+
+### IG-0 conclusion
+
+- Use the effective session/task workspace root, never the runtime installation root.
+- The ignore path is already present on main, but test it in a temporary repository/worktree.
+- Start enforcement analysis at the central pre-dispatch/action path, then enumerate nested tool/script paths and alternate surfaces. A guard on only two file tools is insufficient.
+- Treat arbitrary terminal and code-execution calls as potentially mutating unless a trustworthy, runtime-enforced classification proves otherwise. A conservative initial policy may require a valid gate report before engineering-task terminal/code execution, then relax only with tests and evidence.
+- Do not wire GitNexus as the default provider until its write behavior and output contract are safely wrapped.
+- **IG-0 remains IN_PROGRESS / NOT VERIFIED** until the complete mutation-channel inventory, selected runtime hook, and cross-surface tests are established.
+
+## 13. Open decisions before runtime implementation
 
 - Confirm which runtime boundary can reliably gate non-trivial code mutations across CLI and any supported gateway/unattended contexts.
 - Choose atomic JSONL/manifest storage versus SQLite after measuring query/update patterns and recovery behavior.
