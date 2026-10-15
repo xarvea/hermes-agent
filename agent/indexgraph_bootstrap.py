@@ -56,8 +56,6 @@ SECRET_NAMES = frozenset({
 _IMPORT_RE = re.compile(
     r"""(?:from\s+|import\s*\(?\s*|require\s*\(\s*)["']([^"']+)["']"""
 )
-_GO_IMPORT_RE = re.compile(r"""^\s*"([^"]+)"\s*$""", re.MULTILINE)
-_CARGO_DEP_RE = re.compile(r"^\s*([A-Za-z0-9_-]+)\s*=\s*(.+)$")
 
 
 @dataclass(frozen=True)
@@ -93,11 +91,17 @@ def _is_secret_path(path: str) -> bool:
     return name in {".env", ".npmrc", ".pypirc", ".netrc"}
 
 
-def _is_eligible(path: str, policy: BootstrapPolicy) -> bool:
+def _excluded_by_policy(path: str, policy: BootstrapPolicy) -> bool:
     parts = PurePosixPath(path).parts
-    if not parts or any(part in policy.excluded_dirs for part in parts):
-        return False
-    if _is_secret_path(path):
+    return (
+        not parts
+        or any(part in policy.excluded_dirs for part in parts)
+        or _is_secret_path(path)
+    )
+
+
+def _is_eligible(path: str, policy: BootstrapPolicy) -> bool:
+    if _excluded_by_policy(path, policy):
         return False
     suffix = PurePosixPath(path).suffix.lower()
     name = PurePosixPath(path).name.lower()
@@ -342,12 +346,9 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
     eligible: list[str] = []
     unsupported: list[str] = []
     for path in raw_paths:
-        if not _is_eligible(path, policy):
+        if _excluded_by_policy(path, policy):
             excluded.append(path)
-        elif (
-            PurePosixPath(path).suffix.lower() not in policy.text_suffixes
-            and PurePosixPath(path).name.lower() not in MANIFEST_NAMES
-        ):
+        elif not _is_eligible(path, policy):
             unsupported.append(path)
         else:
             eligible.append(path)
