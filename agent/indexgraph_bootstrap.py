@@ -108,7 +108,10 @@ def _git_paths(root: Path) -> list[str] | None:
     """Return tracked plus eligible untracked paths; None means not a Git worktree."""
     try:
         result = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            [
+                "git", "-C", str(root), "ls-files", "--cached", "--others",
+                "--exclude-standard", "-z",
+            ],
             check=False, capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -145,7 +148,8 @@ def _source_revision(root: Path) -> str | None:
     except (OSError, subprocess.TimeoutExpired):
         return None
     revision = result.stdout.strip()
-    return revision if result.returncode == 0 and re.fullmatch(r"[0-9a-fA-F]{40,64}", revision) else None
+    valid = result.returncode == 0 and re.fullmatch(r"[0-9a-fA-F]{40,64}", revision)
+    return revision if valid else None
 
 
 def _node(project_id: str, kind: str, path: str, label: str, fingerprint: str,
@@ -190,7 +194,8 @@ def _resolve_import(root: Path, source: str, specifier: str) -> str | None:
         return None
     candidates = [relative]
     if not Path(relative).suffix:
-        candidates.extend(relative + suffix for suffix in (".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"))
+        suffixes = (".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx")
+        candidates.extend(relative + suffix for suffix in suffixes)
         candidates.extend(f"{relative}/index{suffix}" for suffix in (".js", ".jsx", ".ts", ".tsx"))
         candidates.append(f"{relative}/__init__.py")
     for candidate in candidates:
@@ -217,7 +222,8 @@ def _python_imports(data: bytes, source: str) -> list[tuple[str, int]]:
                 base_parts = parent.parts[:max(0, len(parent.parts) - node.level + 1)]
                 base = "/".join(base_parts)
                 if node.module:
-                    module = "/".join(part for part in (base, node.module.replace(".", "/")) if part)
+                    module_parts = (base, node.module.replace(".", "/"))
+                    module = "/".join(part for part in module_parts if part)
                     if module:
                         imports.append((module, node.lineno))
                 else:
@@ -251,6 +257,7 @@ def _python_requirement_name(requirement: str) -> str:
     match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
     return match.group(1) if match else ''
 
+
 def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
     name = PurePosixPath(path).name.lower()
     try:
@@ -259,7 +266,11 @@ def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
             if not isinstance(record, dict):
                 return []
             dependencies: list[tuple[str, str]] = []
-            for section in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
+            sections = (
+                "dependencies", "devDependencies", "peerDependencies",
+                "optionalDependencies",
+            )
+            for section in sections:
                 values = record.get(section, {})
                 if isinstance(values, dict):
                     dependencies.extend(
@@ -309,7 +320,10 @@ def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
                     if len(fields) >= 3:
                         result.append((fields[1], fields[2]))
             return sorted(set(result))
-    except (UnicodeDecodeError, json.JSONDecodeError, tomllib.TOMLDecodeError, TypeError, ValueError, RecursionError):
+    except (
+        UnicodeDecodeError, json.JSONDecodeError, tomllib.TOMLDecodeError,
+        TypeError, ValueError, RecursionError,
+    ):
         return []
     return []
 
@@ -330,7 +344,10 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
     for path in raw_paths:
         if not _is_eligible(path, policy):
             excluded.append(path)
-        elif PurePosixPath(path).suffix.lower() not in policy.text_suffixes and PurePosixPath(path).name.lower() not in MANIFEST_NAMES:
+        elif (
+            PurePosixPath(path).suffix.lower() not in policy.text_suffixes
+            and PurePosixPath(path).name.lower() not in MANIFEST_NAMES
+        ):
             unsupported.append(path)
         else:
             eligible.append(path)
@@ -376,7 +393,10 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
         file_data[path] = data
 
     project_id = project_id_for(root)
-    project_node = _node(project_id, "project", "", root.name or "project", _fingerprint(str(root).encode()))
+    project_node = _node(
+        project_id, "project", "", root.name or "project",
+        _fingerprint(str(root).encode()),
+    )
     nodes: list[GraphNode] = [project_node]
     edges: list[GraphEdge] = []
     path_nodes: dict[str, GraphNode] = {}
@@ -388,7 +408,10 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
             directories.add("/".join(parts[:i]))
     directory_nodes: dict[str, GraphNode] = {}
     for path in sorted(directories):
-        node = _node(project_id, "directory", path, PurePosixPath(path).name, _fingerprint(path.encode()))
+        node = _node(
+            project_id, "directory", path, PurePosixPath(path).name,
+            _fingerprint(path.encode()),
+        )
         directory_nodes[path] = node
         nodes.append(node)
     for path, data in sorted(file_data.items()):
@@ -432,25 +455,37 @@ def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None)
         for target_path, line in sorted(set(imports)):
             target_node = path_nodes.get(target_path)
             if target_node:
-                edge = _edge(project_id, source_node, "imports", target_node, path, fingerprints[path])
+                edge = _edge(
+                    project_id, source_node, "imports", target_node, path,
+                    fingerprints[path],
+                )
                 edges.append(GraphEdge(**{
                     **edge.__dict__,
-                    "id": stable_id(project_id, source_node.id, "imports", target_node.id, str(line)),
+                    "id": stable_id(
+                        project_id, source_node.id, "imports", target_node.id, str(line),
+                    ),
                     "start_line": line,
                     "end_line": line,
                 }))
 
-        if PurePosixPath(path).name.lower() in {"pyproject.toml", "package.json", "cargo.toml", "go.mod"}:
+        dependency_manifests = {"pyproject.toml", "package.json", "cargo.toml", "go.mod"}
+        if PurePosixPath(path).name.lower() in dependency_manifests:
             for package, specifier in _dependency_declarations(path, data):
                 package_node = _node(
                     project_id, "package", path, package, fingerprints[path],
                     attributes={"specifier": specifier[:512], "declared_by": path},
                 )
                 package_node = GraphNode(
-                    **{**package_node.__dict__, "id": stable_id(project_id, "package", path, package, specifier)}
+                    **{
+                        **package_node.__dict__,
+                        "id": stable_id(project_id, "package", path, package, specifier),
+                    }
                 )
                 nodes.append(package_node)
-                edges.append(_edge(project_id, source_node, "declares_dependency", package_node, path, fingerprints[path]))
+                edges.append(_edge(
+                    project_id, source_node, "declares_dependency", package_node,
+                    path, fingerprints[path],
+                ))
 
     revision = _source_revision(root)
     indexed_paths = tuple(sorted(file_data))
