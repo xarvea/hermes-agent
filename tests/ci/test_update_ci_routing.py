@@ -227,20 +227,22 @@ def _windows_desktop_updater_tests_selected(run: dict) -> bool:
 
 # Each real consumer of a lane, as a path of job names from ci.yaml down.
 _CONSUMERS: dict[str, tuple[tuple[str, ...], ...]] = {
+    # Only jobs scheduled by the Linux-only ci.yaml are active consumers here.
+    # Windows journeys remain in reusable workflows but are intentionally not dispatched.
     "e2e_upgrade": (
         ("tests", "e2e-upgrade-plan"),
         ("tests", "e2e-upgrade"),
-        ("tests-os", "install-update-e2e", "install-update"),
     ),
-    "e2e": (("tests", "e2e"), ("tests-os", "e2e-windows")),
+    "e2e": (("tests", "e2e"),),
     "e2e_desktop_update": (("e2e-desktop-update", "update"),),
 }
 
 
 def _consumers_reached(run: dict, lane: str) -> dict[str, bool]:
     if lane == "desktop_updater":
-        return {"tests-os/os-tests[windows] keeps test_desktop_update_windows_*":
-                _windows_desktop_updater_tests_selected(run)}
+        # This lane belongs to the dormant cross-platform workflow. It must not
+        # be represented as a passing Windows test on a Linux-only CI run.
+        return {}
     reached = {}
     for path in _CONSUMERS[lane]:
         node = _reached(run, *path)
@@ -253,6 +255,14 @@ def _consumers_reached(run: dict, lane: str) -> dict[str, bool]:
 
 
 _GATED = ("python", "desktop_updater", "e2e", "e2e_upgrade", "e2e_desktop_update")
+
+
+def test_linux_only_policy_explicitly_excludes_os_specific_jobs():
+    ci = _yaml(".github/workflows/ci.yaml")
+    job = ci["jobs"]["tests-os"]
+    assert job.get("if") is False
+    assert "Linux-only target" in str(job.get("name", ""))
+    assert "tests-os" not in ci["jobs"]["all-checks-pass"]["needs"]
 
 
 def test_replay_evaluator_follows_actions_semantics():
@@ -275,11 +285,11 @@ def test_every_set_lane_reaches_its_consumer_whatever_the_other_lanes_say(combo)
     lanes = {k: False for k in cc.classify(["README.md"])}
     lanes.update(zip(_GATED, combo))
     run = _ci_run(lanes)
-    for lane in ("desktop_updater", "e2e", "e2e_upgrade", "e2e_desktop_update"):
+    for lane in ("e2e", "e2e_upgrade", "e2e_desktop_update"):
         reached = _consumers_reached(run, lane)
         if lanes[lane]:
-            assert all(reached.values()), f"{lane}=true but not dispatched: {reached}"
-        elif lane != "desktop_updater":
+            assert reached and all(reached.values()), f"{lane}=true but not dispatched: {reached}"
+        else:
             assert not any(reached.values()), f"{lane}=false but ran anyway: {reached}"
 
 
@@ -293,8 +303,8 @@ _R15_CASES = {
     "hermes_cli/memory_provider_migration.py": ("e2e_upgrade", "e2e_desktop_update"),
     "hermes_cli/source_build.py": ("e2e_upgrade", "e2e_desktop_update"),
     "hermes_cli/source_completion.py": ("e2e_upgrade", "e2e_desktop_update"),
-    "apps/desktop/electron/update-marker.ts": ("desktop_updater", "e2e_desktop_update"),
-    "apps/desktop/electron/handoff-result.ts": ("desktop_updater", "e2e_desktop_update"),
+    "apps/desktop/electron/update-marker.ts": ("e2e_desktop_update",),
+    "apps/desktop/electron/handoff-result.ts": ("e2e_desktop_update",),
 }
 
 
@@ -315,9 +325,9 @@ def test_update_owner_change_dispatches_its_suites_end_to_end(path, lanes):
 _R6_CASES = {
     # The Desktop gate's marker reader: the hand-off script's contract (desktop_updater) and the
     # Desktop update E2E that drives the gate.
-    "apps/desktop/electron/update-marker-gate.ts": ("desktop_updater", "e2e_desktop_update"),
-    # Stops the backend before a remote update: typecheck/vitest and the hand-off script tests.
-    "apps/desktop/electron/remote-lifecycle.ts": ("frontend", "desktop_updater"),
+    "apps/desktop/electron/update-marker-gate.ts": ("e2e_desktop_update",),
+    # Stops the backend before a remote update: active Linux frontend checks only.
+    "apps/desktop/electron/remote-lifecycle.ts": ("frontend",),
     # The Tauri updater's marker claim: cargo, the only CI that builds it (review CI3).
     "apps/bootstrap-installer/src-tauri/src/marker.rs": ("rust",),
     # The launchers reach the launch repair: the Desktop update relaunches through them too.
@@ -334,8 +344,6 @@ def test_update_path_change_selects_every_suite_that_exercises_it(path, lanes):
         if lane.startswith("e2e"):
             reached = _consumers_reached(run, lane)
             assert all(reached.values()), f"{path}: {lane}=true never reaches {reached}"
-        if lane == "desktop_updater":
-            assert _windows_desktop_updater_tests_selected(run), f"{path}: desktop_updater never reaches its tests"
 
 
 # Review CI2/CI3: update-path files the classifier sent to the wrong suites.
@@ -343,8 +351,8 @@ _CI3_CASES = {
     # /api/health `commit`: host-backend-attach compares it before attaching after an update.
     "hermes_cli/web_routers/status.py": ("python", "e2e_desktop_update"),
     # The SSH remote's marker judge/gate: typecheck/vitest and the marker contract's script tests.
-    "apps/desktop/electron/remote-update-marker-programs.ts": ("frontend", "desktop_updater"),
-    "apps/desktop/electron/remote-update-marker-programs.test.ts": ("frontend", "desktop_updater"),
+    "apps/desktop/electron/remote-update-marker-programs.ts": ("frontend",),
+    "apps/desktop/electron/remote-update-marker-programs.test.ts": ("frontend",),
 }
 
 
@@ -399,7 +407,6 @@ def _fixture_lanes_reached(fixture: str) -> dict[str, bool]:
     run = _ci_run(classified)
     reached = {lane: classified[lane] and _reached(run, *job) is not None
                for lane, job in _FIXTURE_LANE_JOBS.items()}
-    reached["desktop_updater"] = classified["desktop_updater"] and _windows_desktop_updater_tests_selected(run)
     return reached
 
 
@@ -481,10 +488,7 @@ def test_native_windows_lane_selects_the_replay_and_its_controls():
 _REQUIRED_STEP_CASES = (
     ("e2e_desktop_update", ".github/workflows/e2e-desktop-update.yml", "update", "Run the update suite under xvfb"),
     ("e2e_upgrade", ".github/workflows/tests.yml", "e2e-upgrade", "Run upgrade e2e tests"),
-    ("e2e_upgrade", ".github/workflows/windows-install-update-e2e.yml", "install-update", "Run Windows install + update E2E"),
-    ("desktop_updater", ".github/workflows/tests-os.yml", "os-tests", "Run ${{ matrix.marker }} tests"),
     ("e2e", ".github/workflows/tests.yml", "e2e", "Run e2e tests"),
-    ("e2e", ".github/workflows/tests-os.yml", "e2e-windows", "Run Windows E2E suite"),
 )
 
 
@@ -538,15 +542,16 @@ def test_selection_receipt_does_not_require_the_native_jobs_venv(tmp_path):
 
 @_NATIVE_WINDOWS_TOO
 def test_replay_uses_executed_gate_output(monkeypatch):
-    path = "apps/desktop/electron/handoff-result.ts"
-    assert all(_consumers_reached(_ci_run(_real_classifier([path])), "desktop_updater").values())
+    # Exercise an active Linux E2E lane, not the intentionally dormant Windows lane.
+    path = "apps/desktop/electron/update-marker.ts"
+    assert all(_consumers_reached(_ci_run(_real_classifier([path])), "e2e_desktop_update").values())
     workflow = _mutated_yaml(monkeypatch, ".github/workflows/ci.yaml")
     gate = next(s for s in workflow["jobs"]["detect"]["steps"] if s.get("id") == "gate-lanes")
     needle = "    for lane, value in values.items():"
     assert needle in gate["run"]
-    gate["run"] = gate["run"].replace(needle, "    values['desktop_updater'] = 'false'\n" + needle)
+    gate["run"] = gate["run"].replace(needle, "    values['e2e_desktop_update'] = 'false'\n" + needle)
     with pytest.raises(AssertionError):
-        test_update_owner_change_dispatches_its_suites_end_to_end(path, ("desktop_updater",))
+        test_update_owner_change_dispatches_its_suites_end_to_end(path, ("e2e_desktop_update",))
 
 
 _PROBE_STEP = {"run": r'''python3 -c 'import sys; print("py3=" + sys.executable)' >> "$GITHUB_OUTPUT"
@@ -795,9 +800,6 @@ def test_desktop_build_scripts_start_the_desktop_update_suite():
 _STRICT_STEPS = (
     (("tests", "e2e"), ".github/workflows/tests.yml", "e2e", "Run e2e tests"),
     (("tests", "e2e-upgrade"), ".github/workflows/tests.yml", "e2e-upgrade", "Run upgrade e2e tests"),
-    (("tests-os", "e2e-windows"), ".github/workflows/tests-os.yml", "e2e-windows", "Run Windows E2E suite"),
-    (("tests-os", "install-update-e2e", "install-update"), ".github/workflows/windows-install-update-e2e.yml",
-     "install-update", "Run Windows install + update E2E"),
 )
 
 
@@ -827,7 +829,7 @@ def test_pull_requests_and_main_pushes_never_run_e2e(event_name):
     for lane in ("e2e", "e2e_upgrade", "e2e_desktop_update"):
         assert not any(_consumers_reached(run, lane).values()), f"{event_name}: {lane} ran"
     assert "e2e-desktop-core" not in run
-    assert "tests" in run and "tests-os" in run  # the unit lanes still run
+    assert "tests" in run and "tests-os" not in run  # Linux unit lane only
 
 
 def test_windows_install_update_dispatch_alone_sets_strict():
