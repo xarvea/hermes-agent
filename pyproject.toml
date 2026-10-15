@@ -5,7 +5,7 @@
 [project]
 name = "hermes-agent"
 version = "0.0.0"
-description = "The self-improving AI agent — creates skills from experience, improves them during use, and runs anywhere"
+description = "Zivi personal Linux testing fork of Hermes Agent; keeps the hermes CLI for runtime compatibility"
 readme = "README.md"
 # 3.14 is the newest python we know we have wheels for.
 # we *only* support 3.14, BUT we need to allow old hermes installs on <3.14
@@ -559,6 +559,8 @@ hermes-agent = "agent.legacy_cli:main"
 hermes-acp = "acp_adapter.entry:main"
 
 [tool.hermes]
+# Internal compatibility namespace retained by the upstream package manager. Zivi is the product identity;
+# the runtime CLI remains `hermes` and these settings must not be renamed without updating their consumers.
 # Extras that only an explicit selection installs (setup, sync_venv). Bundles
 # build with --all-extras and pass --no-extra for each of these, so their
 # closures never ship. KittenTTS pulls torch, transformers and spaCy through
