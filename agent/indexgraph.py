@@ -411,7 +411,7 @@ class IndexGraphStore:
 
     def load_snapshot(self) -> tuple[IndexManifest | None, list[GraphNode], list[GraphEdge]]:
         """Load the current validated-schema snapshot; returns an empty result before first build."""
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute("SELECT payload FROM manifest WHERE singleton = 1").fetchone()
             manifest = IndexManifest.from_record(json.loads(row["payload"])) if row else None
             nodes = [
@@ -442,6 +442,6 @@ class IndexGraphStore:
 
     def integrity_check(self) -> str:
         """Run SQLite's built-in integrity check and return its result."""
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute("PRAGMA integrity_check").fetchone()
         return str(row[0]) if row else "unknown"
