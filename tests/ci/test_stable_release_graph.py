@@ -164,10 +164,10 @@ def test_all_applicable_ci_jobs_are_aggregated_and_desktop_e2e_stays_deferred():
     jobs = workflow("ci.yaml")["jobs"]
     checks = {
         name for name, job in jobs.items()
-        if "uses" in job and job.get("if") is not False
+        if "uses" in job and str(job.get("if", "")).strip().lower() != "false"
     }
     assert checks <= set(jobs["all-checks-pass"]["needs"])
-    assert jobs["tests-os"].get("if") is False
+    assert str(jobs["tests-os"].get("if", "")).strip().lower() == "false"
     assert "tests-os" not in jobs["all-checks-pass"]["needs"]
     assert not gate(jobs["e2e-desktop"]["if"], {}, {})
     assert "workflow_call" in workflow("ci.yaml")["on"]
