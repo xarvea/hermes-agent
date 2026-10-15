@@ -300,7 +300,9 @@ def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
                             for item in values
                             if isinstance(item, str)
                         )
-            return sorted((package, spec) for package, spec in result if package)
+            return sorted({
+                (package, spec) for package, spec in result if package
+            })
         if name == "cargo.toml":
             record = tomllib.loads(data.decode("utf-8"))
             result = []
