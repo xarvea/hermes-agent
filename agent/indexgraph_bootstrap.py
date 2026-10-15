@@ -353,88 +353,105 @@ def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
 def _collect_files(
     root: Path, policy: BootstrapPolicy,
 ) -> tuple[list[str], list[str], list[str], dict[str, bytes], list[str]]:
-raw_paths = _git_paths(root)
-if raw_paths is None:
-    raw_paths = _walk_paths(root, policy)
+    raw_paths = _git_paths(root)
+    if raw_paths is None:
+        raw_paths = _walk_paths(root, policy)
 
-excluded: list[str] = []
-eligible: list[str] = []
-unsupported: list[str] = []
-for path in raw_paths:
-    if _excluded_by_policy(path, policy):
-        excluded.append(path)
-    elif not _is_eligible(path, policy):
-        unsupported.append(path)
-    else:
-        eligible.append(path)
-if len(eligible) > policy.max_files:
-    raise ValueError(f"project exceeds bootstrap file limit ({policy.max_files})")
+    excluded: list[str] = []
+    eligible: list[str] = []
+    unsupported: list[str] = []
+    for path in raw_paths:
+        if _excluded_by_policy(path, policy):
+            excluded.append(path)
+        elif not _is_eligible(path, policy):
+            unsupported.append(path)
+        else:
+            eligible.append(path)
+    if len(eligible) > policy.max_files:
+        raise ValueError(f"project exceeds bootstrap file limit ({policy.max_files})")
 
-file_data: dict[str, bytes] = {}
-errors: list[str] = []
-total_bytes = 0
-for path in eligible:
-    lexical_path = root / Path(*PurePosixPath(path).parts)
-    if any(
-        (root / Path(*PurePosixPath(path).parts[:index])).is_symlink()
-        for index in range(1, len(PurePosixPath(path).parts) + 1)
-    ):
-        excluded.append(path)
-        continue
-    candidate = lexical_path.resolve(strict=False)
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        excluded.append(path)
-        continue
-    if not candidate.is_file():
-        excluded.append(path)
-        continue
-    try:
-        size = candidate.stat().st_size
-        if size > policy.max_file_bytes:
+    file_data: dict[str, bytes] = {}
+    errors: list[str] = []
+    total_bytes = 0
+    for path in eligible:
+        lexical_path = root / Path(*PurePosixPath(path).parts)
+        if any(
+            (root / Path(*PurePosixPath(path).parts[:index])).is_symlink()
+            for index in range(1, len(PurePosixPath(path).parts) + 1)
+        ):
+            excluded.append(path)
+            continue
+        candidate = lexical_path.resolve(strict=False)
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            excluded.append(path)
+            continue
+        if not candidate.is_file():
+            excluded.append(path)
+            continue
+        try:
+            size = candidate.stat().st_size
+            if size > policy.max_file_bytes:
+                unsupported.append(path)
+                continue
+            if total_bytes + size > policy.max_total_bytes:
+                errors.append("total byte budget reached; remaining files not read")
+                break
+            data = candidate.read_bytes()
+        except OSError:
+            errors.append(f"unreadable file: {path[:400]}")
+            continue
+        if b"\0" in data:
             unsupported.append(path)
             continue
-        if total_bytes + size > policy.max_total_bytes:
-            errors.append("total byte budget reached; remaining files not read")
-            break
-        data = candidate.read_bytes()
-    except OSError:
-        errors.append(f"unreadable file: {path[:400]}")
-        continue
-    if b"\0" in data:
-        unsupported.append(path)
-        continue
-    total_bytes += len(data)
-    file_data[path] = data
+        total_bytes += len(data)
+        file_data[path] = data
     return eligible, excluded, unsupported, file_data, errors
 
 
 def _build_structure(
     root: Path, file_data: dict[str, bytes],
 ) -> tuple[str, GraphNode, list[GraphNode], list[GraphEdge], dict[str, GraphNode], dict[str, str]]:
-project_id = project_id_for(root)
-project_node = _node(
-    project_id, "project", "", root.name or "project",
-    _fingerprint(str(root).encode()),
-)
-nodes: list[GraphNode] = [project_node]
-edges: list[GraphEdge] = []
-path_nodes: dict[str, GraphNode] = {}
-fingerprints = {path: _fingerprint(data) for path, data in file_data.items()}
-directories: set[str] = set()
-for path in sorted(file_data):
-    parts = PurePosixPath(path).parts
-    for i in range(1, len(parts)):
-        directories.add("/".join(parts[:i]))
-directory_nodes: dict[str, GraphNode] = {}
-for path in sorted(directories):
-    node = _node(
-        project_id, "directory", path, PurePosixPath(path).name,
-        _fingerprint(path.encode()),
+    project_id = project_id_for(root)
+    project_node = _node(
+        project_id, "project", "", root.name or "project",
+        _fingerprint(str(root).encode()),
     )
-    directory_nodes[path] = node
-    nodes.append(node)
+    nodes: list[GraphNode] = [project_node]
+    edges: list[GraphEdge] = []
+    path_nodes: dict[str, GraphNode] = {}
+    fingerprints = {path: _fingerprint(data) for path, data in file_data.items()}
+    directories: set[str] = set()
+    for path in sorted(file_data):
+        parts = PurePosixPath(path).parts
+        for i in range(1, len(parts)):
+            directories.add("/".join(parts[:i]))
+    directory_nodes: dict[str, GraphNode] = {}
+    for path in sorted(directories):
+        node = _node(
+            project_id, "directory", path, PurePosixPath(path).name,
+            _fingerprint(path.encode()),
+        )
+        directory_nodes[path] = node
+        nodes.append(node)
+    for path, data in sorted(file_data.items()):
+        is_manifest = PurePosixPath(path).name.lower() in MANIFEST_NAMES
+        node = _node(
+            project_id, "manifest" if is_manifest else "file", path,
+            PurePosixPath(path).name, fingerprints[path],
+            attributes={"size_bytes": len(data), "suffix": PurePosixPath(path).suffix.lower()},
+        )
+        path_nodes[path] = node
+        nodes.append(node)
+    for path, node in directory_nodes.items():
+        parent_path = PurePosixPath(path).parent.as_posix()
+        parent = directory_nodes.get(parent_path, project_node)
+        edges.append(_edge(project_id, parent, "contains", node, path, node.source_fingerprint))
+    for path, node in path_nodes.items():
+        parent_path = PurePosixPath(path).parent.as_posix()
+        parent = directory_nodes.get(parent_path, project_node)
+        edges.append(_edge(project_id, parent, "contains", node, path, fingerprints[path]))
     return project_id, project_node, nodes, edges, path_nodes, fingerprints
 
 
@@ -443,78 +460,60 @@ def _add_relationships(
     nodes: list[GraphNode], edges: list[GraphEdge],
     path_nodes: dict[str, GraphNode], fingerprints: dict[str, str],
 ) -> None:
-for path, data in sorted(file_data.items()):
-    is_manifest = PurePosixPath(path).name.lower() in MANIFEST_NAMES
-    node = _node(
-        project_id, "manifest" if is_manifest else "file", path,
-        PurePosixPath(path).name, fingerprints[path],
-        attributes={"size_bytes": len(data), "suffix": PurePosixPath(path).suffix.lower()},
-    )
-    path_nodes[path] = node
-    nodes.append(node)
-for path, node in directory_nodes.items():
-    parent_path = PurePosixPath(path).parent.as_posix()
-    parent = directory_nodes.get(parent_path, project_node)
-    edges.append(_edge(project_id, parent, "contains", node, path, node.source_fingerprint))
-for path, node in path_nodes.items():
-    parent_path = PurePosixPath(path).parent.as_posix()
-    parent = directory_nodes.get(parent_path, project_node)
-    edges.append(_edge(project_id, parent, "contains", node, path, fingerprints[path]))
+    for path, data in sorted(file_data.items()):
+        source_node = path_nodes[path]
+        suffix = PurePosixPath(path).suffix.lower()
+        imports: list[tuple[str, int]] = []
+        if suffix in {".py", ".pyi"}:
+            for module_path, line in _python_imports(data, path):
+                resolved = _resolve_python_module(root, module_path)
+                if resolved:
+                    imports.append((resolved, line))
+        elif suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}:
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                text = ""
+            for match in _IMPORT_RE.finditer(text):
+                specifier = match.group(1)
+                target = _resolve_import(root, path, specifier)
+                if target:
+                    line = text.count("\n", 0, match.start()) + 1
+                    imports.append((target, line))
+        for target_path, line in sorted(set(imports)):
+            target_node = path_nodes.get(target_path)
+            if target_node:
+                edge = _edge(
+                    project_id, source_node, "imports", target_node, path,
+                    fingerprints[path],
+                )
+                edges.append(GraphEdge(**{
+                    **edge.__dict__,
+                    "id": stable_id(
+                        project_id, source_node.id, "imports", target_node.id, str(line),
+                    ),
+                    "start_line": line,
+                    "end_line": line,
+                }))
 
-for path, data in sorted(file_data.items()):
-    source_node = path_nodes[path]
-    suffix = PurePosixPath(path).suffix.lower()
-    imports: list[tuple[str, int]] = []
-    if suffix in {".py", ".pyi"}:
-        for module_path, line in _python_imports(data, path):
-            resolved = _resolve_python_module(root, module_path)
-            if resolved:
-                imports.append((resolved, line))
-    elif suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}:
-        try:
-            text = data.decode("utf-8")
-        except UnicodeDecodeError:
-            text = ""
-        for match in _IMPORT_RE.finditer(text):
-            specifier = match.group(1)
-            target = _resolve_import(root, path, specifier)
-            if target:
-                line = text.count("\n", 0, match.start()) + 1
-                imports.append((target, line))
-    for target_path, line in sorted(set(imports)):
-        target_node = path_nodes.get(target_path)
-        if target_node:
-            edge = _edge(
-                project_id, source_node, "imports", target_node, path,
-                fingerprints[path],
-            )
-            edges.append(GraphEdge(**{
-                **edge.__dict__,
-                "id": stable_id(
-                    project_id, source_node.id, "imports", target_node.id, str(line),
-                ),
-                "start_line": line,
-                "end_line": line,
-            }))
-
-    dependency_manifests = {"pyproject.toml", "package.json", "cargo.toml", "go.mod"}
-    if PurePosixPath(path).name.lower() in dependency_manifests:
-        for package, specifier in _dependency_declarations(path, data):
-            package_node = _node(
-                project_id, "package", path, package, fingerprints[path],
-                attributes={"specifier": specifier[:512], "declared_by": path},
-            )
-            package_node = GraphNode(
-                **{
-                    **package_node.__dict__,
-                    "id": stable_id(project_id, "package", path, package, specifier),
-                }
-            )
-            nodes.append(package_node)
-            edges.append(_edge(
-                project_id, source_node, "declares_dependency", package_node,
-                path, fingerprints[path],
-            ))
+        dependency_manifests = {"pyproject.toml", "package.json", "cargo.toml", "go.mod"}
+        if PurePosixPath(path).name.lower() in dependency_manifests:
+            for package, specifier in _dependency_declarations(path, data):
+                package_node = _node(
+                    project_id, "package", path, package, fingerprints[path],
+                    attributes={"specifier": specifier[:512], "declared_by": path},
+                )
+                package_node = GraphNode(
+                    **{
+                        **package_node.__dict__,
+                        "id": stable_id(project_id, "package", path, package, specifier),
+                    }
+                )
+                nodes.append(package_node)
+                edges.append(_edge(
+                    project_id, source_node, "declares_dependency", package_node,
+                    path, fingerprints[path],
+                ))
 
 
 def build_index(project_root: str | Path, policy: BootstrapPolicy | None = None) -> BootstrapReport:
