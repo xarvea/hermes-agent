@@ -207,7 +207,7 @@ def _resolve_import(root: Path, source: str, specifier: str) -> str | None:
 def _python_imports(data: bytes, source: str) -> list[tuple[str, int]]:
     try:
         tree = ast.parse(data.decode("utf-8"), filename=source)
-    except (UnicodeDecodeError, SyntaxError, ValueError):
+    except (UnicodeDecodeError, SyntaxError, ValueError, RecursionError):
         return []
     imports: list[tuple[str, int]] = []
     parent = PurePosixPath(source).parent
@@ -299,7 +299,7 @@ def _dependency_declarations(path: str, data: bytes) -> list[tuple[str, str]]:
                     if len(fields) >= 3:
                         result.append((fields[1], fields[2]))
             return sorted(set(result))
-    except (UnicodeDecodeError, json.JSONDecodeError, tomllib.TOMLDecodeError, TypeError, ValueError):
+    except (UnicodeDecodeError, json.JSONDecodeError, tomllib.TOMLDecodeError, TypeError, ValueError, RecursionError):
         return []
     return []
 
