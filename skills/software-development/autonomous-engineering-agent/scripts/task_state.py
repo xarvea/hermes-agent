@@ -52,7 +52,7 @@ def _initialize(conn: sqlite3.Connection) -> None:
     }
     if existing_tables:
         if not {"ledger_meta", "tasks", "task_dependencies", "task_events"}.issubset(existing_tables):
-            raise TaskLedgerError("Refusing to initialize a database not owned by the local task ledger.")
+            raise TaskLedgerError("Refusing to initialize a database owned by another application (not the local task ledger).")
         meta_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(ledger_meta)")
         }
