@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
-import { $notifications, clearNotifications, notify, notifyError } from '@/store/notifications'
+import { $notifications, clearNotifications, dismissNotification, notify, notifyError } from '@/store/notifications'
 import { $poolLimitsSettingsRequest } from '@/store/pool-limits'
 import { stubResizeObserver } from '@/test/jsdom'
 
@@ -63,6 +63,18 @@ describe('toast titles', () => {
 
     notifyError(new Error('gateway unavailable'), 'Failed to switch profile')
     expect($notifications.get()[0]?.action).toBeUndefined()
+  })
+
+  it('can dismiss a notification after the renderer window is gone', () => {
+    notify({ id: 'window-gone', message: 'Temporary notification', durationMs: 0 })
+
+    vi.stubGlobal('window', undefined)
+
+    try {
+      expect(() => dismissNotification('window-gone')).not.toThrow()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('keeps background pool-slot timeouts quiet if they reach the renderer', () => {

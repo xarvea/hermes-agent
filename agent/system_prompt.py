@@ -19,7 +19,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agent.delegation_context import owned_kanban_task
 from agent.prompt_builder import (
-    DEFAULT_AGENT_IDENTITY, EXECUTION_GUIDANCE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
+    AUTONOMOUS_ENGINEERING_GUIDANCE,
+    DEFAULT_AGENT_IDENTITY,
+    EXECUTION_GUIDANCE_MODELS,
+    GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
     HERMES_AGENT_HELP_GUIDANCE, HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS, KANBAN_GUIDANCE,
     PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS, SESSION_SEARCH_GUIDANCE,
     SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TELEGRAM_RICH_MESSAGES_HINT,
@@ -560,6 +563,7 @@ def _guidance_parts(agent: Any) -> list[str]:
                 ("_parallel_tool_call_guidance", PARALLEL_TOOL_CALL_GUIDANCE),
             ) if getattr(agent, flag, True)
         ]
+        parts.append(AUTONOMOUS_ENGINEERING_GUIDANCE)
     parts.append(_tool_guidance_block(agent))  # None/empty entries are dropped by _join_tier
     if not agent.valid_tool_names:
         return parts
@@ -722,6 +726,26 @@ def _context_files_part(agent: Any, ctx_len: Optional[int], soul_loaded: bool) -
         allow_install_tree_fallback=agent.platform in ("cli", "tui"), home_override=_agent_home(agent))]
 
 
+
+def _engineering_task_context_part(agent: Any) -> list[str]:
+    """Read active project task state once at session prompt-build time for automatic resume."""
+    if getattr(agent, "skip_context_files", False):
+        return []
+    try:
+        cwd = resolve_context_cwd() or resolve_agent_cwd()
+        if not cwd:
+            return []
+        cwd_path = Path(cwd).resolve()
+        project_root = _pb._find_git_root(cwd_path) or cwd_path
+        from agent.engineering_task_context import load_active_tasks
+
+        block = load_active_tasks(project_root)
+        return [block] if block else []
+    except OSError:
+        logger.debug("Engineering task context could not resolve the active project", exc_info=True)
+        return []
+
+
 def _join_tier(parts: list[Optional[str]]) -> str:
     """Join non-empty parts; None/blank entries are dropped."""
     return "\n\n".join(p.strip() for p in parts if p and p.strip())
@@ -767,6 +791,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     if system_message is not None:
         context_parts.append(system_message)
     context_parts.extend(_context_files_part(agent, _ctx_len, _soul_loaded))
+    context_parts.extend(_engineering_task_context_part(agent))
     if coding_workspace_parts:
         context_parts.extend([*coding_workspace_parts, *coding_trailing_parts, *post_workspace_parts])
     else:

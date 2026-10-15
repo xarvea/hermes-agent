@@ -293,6 +293,7 @@ const sidebars: SidebarsConfig = {
                   key: 'skills-bundled-software-development',
                   collapsed: true,
                   items: [
+                    'user-guide/skills/bundled/software-development/software-development-autonomous-engineering-agent',
                     'user-guide/skills/bundled/software-development/software-development-codebase-inspection',
                     'user-guide/skills/bundled/software-development/software-development-dogfood',
                     'user-guide/skills/bundled/software-development/software-development-github',

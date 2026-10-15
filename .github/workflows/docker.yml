@@ -71,7 +71,7 @@ jobs:
   # the parent stable-release workflow, which passes the candidate commit.
   mode:
     name: Resolve release phase
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       phase: ${{ steps.resolve.outputs.phase }}
@@ -100,7 +100,7 @@ jobs:
     name: Detect affected areas
     needs: [mode]
     if: needs.mode.outputs.release != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       build: ${{ steps.gate.outputs.build }}
@@ -131,9 +131,9 @@ jobs:
             echo "build=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Build and test the image for each architecture. This job runs PR code, so
-  # in standalone mode it must remain secret-free. Publishing happens in the
-  # separate, protected publish paths after these tests pass.
+  # Build and test the image for each architecture. This job can run untrusted
+  # PR code, including fork PRs, so it must remain secret-free. Publishing is
+  # independently restricted to trusted upstream pushes to main; PR builds cannot publish.
   #
   # Runs ONLY in standalone mode and in the release 'test' phase: it builds
   # the SAME Dockerfile and runs the SAME real docker-integration tests, then
@@ -145,7 +145,7 @@ jobs:
     needs: [mode, detect]
     if: >-
       !cancelled() && needs.mode.result == 'success' &&
-      ((needs.mode.outputs.release != 'true' && github.repository == 'NousResearch/hermes-agent' && needs.detect.outputs.build == 'true') || needs.mode.outputs.phase == 'test')
+      ((needs.mode.outputs.release != 'true' && needs.detect.outputs.build == 'true') || needs.mode.outputs.phase == 'test')
     strategy:
       fail-fast: false
       matrix:
@@ -157,12 +157,12 @@ jobs:
         variant: [slim, desktop]
         include:
           - arch: amd64
-            runner: ubuntu-latest-32-core
+            runner: ubuntu-24.04
             platform: linux/amd64
           # arm64 builds on the native arm64 larger runner. A build of
           # linux/arm64 on an x64 host uses emulation.
           - arch: arm64
-            runner: ubuntu-latest-32-arm-core
+            runner: ubuntu-24.04-arm
             platform: linux/arm64
 
     runs-on: ${{ matrix.runner }}
@@ -348,11 +348,11 @@ jobs:
         variant: [slim, desktop]
         include:
           - arch: amd64
-            runner: ubuntu-latest-32-core
+            runner: ubuntu-24.04
             platform: linux/amd64
           # Native arm64 for the same reason as the build matrix above.
           - arch: arm64
-            runner: ubuntu-latest-32-arm-core
+            runner: ubuntu-24.04-arm
             platform: linux/arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -443,7 +443,7 @@ jobs:
     # `needs` is the whole 4-leg matrix: only publish both :main variants
     # after every arch and variant publisher succeeds.
     if: ${{ !cancelled() && needs.mode.outputs.release != 'true' && github.repository == 'NousResearch/hermes-agent' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [mode, publish]
     timeout-minutes: 10
     environment: container-publish
@@ -537,7 +537,7 @@ jobs:
       matrix:
         arch: [amd64, arm64]
         variant: [slim, desktop]
-    runs-on: ubuntu-latest-32-core
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       ARCH: ${{ matrix.arch }}
@@ -628,7 +628,7 @@ jobs:
     name: Assemble versioned manifest and digest receipt
     if: needs.mode.outputs.phase == 'publish'
     needs: [mode, release-publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       digest: ${{ steps.list.outputs.digest }}
     timeout-minutes: 15
@@ -760,7 +760,7 @@ jobs:
     name: Docker phase requirements met
     if: always() && inputs.release-phase != ''
     needs: [mode, build, release-publish, release-publish-manifest]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Validate phase job results

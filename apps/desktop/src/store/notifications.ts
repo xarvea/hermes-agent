@@ -340,8 +340,23 @@ export function notifyError(
   )
 }
 
+function clearNotificationTimer(timer: number | undefined) {
+  if (timer === undefined) {
+    return
+  }
+
+  // A notification timer can fire while a renderer test environment is being
+  // torn down. In that case `window` no longer exists, but the timer still
+  // needs to be cleared safely.
+  if (typeof window !== 'undefined') {
+    window.clearTimeout(timer)
+  } else {
+    clearTimeout(timer)
+  }
+}
+
 export function dismissNotification(id: string) {
-  window.clearTimeout(timers.get(id))
+  clearNotificationTimer(timers.get(id))
   timers.delete(id)
   const dismissed = $notifications.get().find(item => item.id === id)
   $notifications.set($notifications.get().filter(item => item.id !== id))
@@ -350,7 +365,7 @@ export function dismissNotification(id: string) {
 
 export function clearNotifications() {
   for (const timer of timers.values()) {
-    window.clearTimeout(timer)
+    clearNotificationTimer(timer)
   }
 
   timers.clear()

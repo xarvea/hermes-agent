@@ -454,7 +454,7 @@ jobs:
       matrix:
         target:
           - label: win32-x64
-            runner: windows-latest-32-core
+            runner: windows-latest
     env: &win32-env
       CHANNEL_BUILD: ${{ needs.validate.outputs.channel-build }}
       HERMES_DESKTOP_VARIANT: bundled
@@ -736,6 +736,9 @@ jobs:
               --name "$TARGET" --root apps/desktop/release "${args[@]}"
           fi
 
+  # This leg may cross-build ARM64 artifacts from the standard x64 host.
+  # Native ARM64 execution/acceptance is separately blocked by
+  # desktop-bundle-smoke.yml until a verified ARM64 runner is available.
   build-win32-arm64-release:
     name: bundled win32-arm64
     if: >-
@@ -752,7 +755,7 @@ jobs:
       matrix:
         target:
           - label: win32-arm64
-            runner: windows-latest-32-arm-core
+            runner: windows-latest
     env: *win32-env
     steps: *win32-steps
 
@@ -772,6 +775,7 @@ jobs:
     env: *win32-env
     steps: *win32-steps
 
+  # Cross-build only on windows-latest (x64); this is not native ARM64 validation.
   build-win32-arm64-commit:
     name: bundled win32-arm64 (commit)
     if: >-
@@ -1475,7 +1479,7 @@ jobs:
       && (needs.validate.outputs.win32-arm64 != 'true' || needs.build-win32-arm64.result == 'success')
       && (inputs.release-phase == '' || inputs.release-phase == 'candidate')
       && (inputs.upload_release == true || inputs.release-phase == 'candidate' || inputs.build_commit != '' || inputs.channel != '')
-    runs-on: windows-latest-32-core
+    runs-on: windows-latest
     environment: release-signing
     cache-mode: read
     timeout-minutes: 45
@@ -2401,7 +2405,7 @@ jobs:
     name: Verify published candidate files
     needs: validate
     if: inputs.release-phase == 'publish'
-    runs-on: ubuntu-latest-32-core
+    runs-on: ubuntu-24.04
     environment: release-signing
     timeout-minutes: 90
     env:
@@ -2430,7 +2434,7 @@ jobs:
     # The Store is not a release gate: a failed submission leaves the release publishable
     # and the summary names the Store package for a manual Partner Center upload.
     continue-on-error: true
-    runs-on: windows-latest-32-core
+    runs-on: windows-latest
     environment: release-signing
     timeout-minutes: 60
     env:

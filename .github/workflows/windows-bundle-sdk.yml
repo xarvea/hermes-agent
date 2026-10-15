@@ -3,17 +3,8 @@ name: Windows bundle SDK
 # tools. The vitest halves under js-tests run on Linux and skip every
 # runIf(win32) leg, so this is the only lane that runs the real downloader.
 on:
-  pull_request:
-    paths:
-      - 'apps/desktop/scripts/windows-bundle-tools.mjs'
-      - 'apps/desktop/scripts/windows-bundle-tools.test.mjs'
-      - 'scripts/msix-shared.mjs'
-      - 'apps/desktop/scripts/msix-shared.test.mjs'
-      - 'apps/desktop/scripts/sign-msix.mjs'
-      - 'apps/desktop/scripts/sign-msix.test.mjs'
-      - 'apps/desktop/scripts/batch-sign-binaries.mjs'
-      - 'apps/desktop/scripts/batch-sign-binaries.test.mjs'
-      - '.github/workflows/windows-bundle-sdk.yml'
+  # Automatic PR validation is disabled while this fork targets Linux/Ubuntu.
+  # Keep workflow_dispatch for explicit Windows SDK diagnostics.
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,12 +15,13 @@ jobs:
   windows-bundle-tools:
     name: Cold Windows SDK (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    # Cold ARM64 npm extraction alone can exceed 15 minutes on the hosted runner.
+    # Only x64 hosted runners are available for this private repository.
+    # Keep one cold-cache pass; ARM64-specific SDK validation is not claimed.
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-latest-32-arm-core, windows-latest-32-arm-core]
+        runner: [windows-latest]
     steps:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
