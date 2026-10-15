@@ -28,7 +28,12 @@ def test_bootstrap_is_deterministic_and_emits_confirmed_local_imports(tmp_path: 
     }
     main = next(node for node in first.nodes if node.path == "src/pkg/main.py")
     util = next(node for node in first.nodes if node.path == "src/pkg/util.py")
-    assert any(edge.from_id == main.id and edge.to_id == util.id and edge.relation == "imports" for edge in first.edges)
+    imports = [
+        edge for edge in first.edges
+        if edge.from_id == main.id and edge.to_id == util.id and edge.relation == "imports"
+    ]
+    assert len(imports) == 2
+    assert len({edge.id for edge in imports}) == 2
     assert all(edge.confidence.value == "confirmed" for edge in first.edges)
 
 
